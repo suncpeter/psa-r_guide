@@ -67,16 +67,19 @@ lmtest::coeftest(c1, vcov. = vcovCL(c1, cluster = d.weights$pcg_id))
 
 # Estimate Propensity Scores Using Generalized Boosted Regression
 
-## Load Data
+## Load Data and Sort
 
 ```{r}
+set.seed(1000)
 d2 <- read_dta("data/g3aca1.dta") %>%
   haven::zap_formats() %>%
   sjlabelled::remove_all_labels() %>%
   as_tibble() %>%
   select(intbl, ageyc, fmale, blck, whit, hisp, pcedu, ipovl, pcemft, fthr,
          dicsagg2, dicsint2, dccereg2, dccscom2, dccpros2, draggr2) %>%
-  drop_na()
+  drop_na() %>%
+  add_column(runif = runif(nrow(.))) %>%
+  arrange(runif)
 ```
 
 ## Generate Propensity Scores
@@ -102,7 +105,7 @@ d2 %>%
   mutate(psb = psb,
     intbl = factor(intbl, labels = c("Control", "Treatment"))) %>%
   ggplot(aes(x = psb, color = intbl)) + theme_classic() +
-  geom_density(size = 1) + xlim(0, 1) + ylim(0, 20) +
+  geom_density(size = 1) + xlim(0, 1) + ylim(0, 22) +
   labs(x = "Predicted Probability", y = "Density",
        title = "Propensity Scores Using Generalized Boosted Regression", color = "Treatment") +
   theme(legend.position = c(0.9, 0.9))
