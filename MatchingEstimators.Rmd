@@ -110,3 +110,12 @@ tribble(
   flextable::flextable() %>%
   flextable::set_table_properties(width = 1, layout = "autofit")
 ```
+
+## Specify Variables in the Bias-Corrected Matching
+
+```{r}
+# Sample Average Treatment Effect (SATE)
+Z <- select(d, age97, pcged97, mratio96, pcg_adc) # Covariates for bias adj.
+summary(Match(Y = Y, Tr = Tr, X = X, Z = Z, M = 4, 
+              BiasAdjust = T, Var.calc = 4, estimand = "ATE", sample = T))
+```
