@@ -24,6 +24,20 @@ header-includes:
 
 ## Problem 1: Generalized Boosted Regression
 
+### Description of Dataset
+
+The dependent variable is `re78` or earnings in 1978 (in thousands of 1978 $). The binary treatment variable is `t` (1 = treated; 0 = control). And the covariates are:
+
+- `age`: Age (in years)
+- `educ`: Years of education
+- `black`: African-American
+- `hisp`: Hispanic
+- `married`: Married
+- `u74`: Unemployed in 1974
+- `u75`: Unemployed in 1975
+- `re74`: Earnings in 1974 (in thousands of 1978 $)
+- `re75`: Earnings in 1975 (in thousands of 1978 $)
+
 ### Load Packages
 
 ```{r message=F, warning=F, error=F}
@@ -150,10 +164,59 @@ tidy(lmtest::coeftest(m3.stata, vcov. = vcovHC(m3.stata, "HC1"))) %>%
   filter(term == "t") # ATT
 ```
 
-\newpage
 ### Check Imbalance
 
-See the Appendix for the custom function `robustse()` that is used to replicate the robust standard errors in Stata.
+We can use logistic regression and OLS regression to check the imbalance of categorical and continuous covariates, respectively:
+
+```{r eval=F}
+# Categorical Covariates
+i1 <- glm(black ~ t, family = quasibinomial, data = d5, weights = stata_ate_w)
+i2 <- glm(hisp ~ t, family = quasibinomial, data = d5, weights = stata_ate_w)
+i3 <- glm(married ~ t, family = quasibinomial, data = d5, weights = stata_ate_w)
+i4 <- glm(u74 ~ t, family = quasibinomial, data = d5, weights = stata_ate_w)
+i5 <- glm(u75 ~ t, family = quasibinomial, data = d5, weights = stata_ate_w)
+robustse(i1, coef = "odd.ratio")
+robustse(i2, coef = "odd.ratio")
+robustse(i3, coef = "odd.ratio")
+robustse(i4, coef = "odd.ratio")
+robustse(i5, coef = "odd.ratio")
+
+# Continuous Covariates
+i6 <- lm(age ~ t, data = d5, weights = stata_ate_w)
+i7 <- lm(educ ~ t, data = d5, weights = stata_ate_w)
+i8 <- lm(re74 ~ t, data = d5, weights = stata_ate_w)
+i9 <- lm(re75 ~ t, data = d5, weights = stata_ate_w)
+lmtest::coeftest(i6, vcov. = vcovHC(i6, "HC1"))
+lmtest::coeftest(i7, vcov. = vcovHC(i7, "HC1"))
+lmtest::coeftest(i8, vcov. = vcovHC(i8, "HC1"))
+lmtest::coeftest(i9, vcov. = vcovHC(i9, "HC1"))
+
+# Alternative Hypothesis Tests
+library(survey)
+i.svy <- svydesign(~1, weights = d5$stata_ate_w, data = d5)
+survey::svychisq(~black + t, design = i.svy)
+survey::svychisq(~hisp + t, design = i.svy)
+survey::svychisq(~married + t, design = i.svy)
+survey::svychisq(~u74 + t, design = i.svy)
+survey::svychisq(~u75 + t, design = i.svy)
+survey::svyttest(age ~ t, design = i.svy)
+survey::svyttest(educ ~ t, design = i.svy)
+survey::svyttest(re74 ~ t, design = i.svy)
+survey::svyttest(re75 ~ t, design = i.svy)
+
+# Standardized Mean Differences
+cobalt::bal.tab(
+  d5 %>% select(black, hisp, married, u74, u75, age, educ, re74, re75),
+  treat = d5$t,
+  weights = d5$stata_ate_w,
+  abs = T,
+  s.d.denom = "pooled"
+)
+```
+
+\newpage
+
+Function to check imbalance for all of the covariates (see the Appendix for the custom function `robustse()` that is used to replicate the robust standard errors in Stata):
 
 ```{r include=F}
 # Replicate Stata robust standard errors
@@ -216,8 +279,6 @@ format_bal <- function(df) {
     kable_styling(latex_options = c("striped", "HOLD_position"))
 }
 ```
-
-\newpage
 
 ```{r}
 # Categorical Variables
