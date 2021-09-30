@@ -85,7 +85,7 @@ d2 <- read_dta("data/g3aca1.dta") %>%
 ## Generate Propensity Scores
 
 ```{r message=F}
-f5 <- as.formula(paste("intbl ~ ", paste(names(select(d2, -intbl)), 
+f5 <- as.formula(paste("intbl ~ ", paste(names(select(d2, -intbl, -runif)), 
                                          collapse = " + ")))
 set.seed(1000)
 m5 <- gbm::gbm(formula = f5,
