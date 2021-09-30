@@ -41,6 +41,20 @@ library(gbm)
 
 # Propensity Score Weighting
 
+## Description of Dataset
+
+This dataset is from a study that investigates intergenerational dependence on welfare and its relation to child academic achievement.^[Hofferth, S., Stafford, F. P., Yeung, W. J., Duncan, G. J., Hill, M. S., Lepkowski, J., et al. (2001). *Panel study of income dynamics, 1968–1999: Supplemental files (computer file), ICPSR version*. Ann Arbor: University of Michigan Survey Research Center.]
+
+The dependent variable is `lwss97` or "letter-word identification" score, and the treatment condition is `kuse` or children who used Aid to Families With Dependent Children (AFDC). The covariates are:
+
+- `male`: Child's Gender: Male (Reference: Female)
+- `black`: Child's Race: African American (Reference: Other)
+- `age97`: Child's Age in 1997
+- `pcged97`: Caregiver's Education in 1997 (Years of Schooling)
+- `mratio96`: Ratio of Family Income to Poverty Line in 1996
+
+Additionally, `pcg_id` is a cluster variable that identifies children nested within families.
+
 ## Load Data with Propensity Scores
 
 ```{r}
@@ -135,6 +149,7 @@ After importing the data, missing data is deleted listwise, and the data is sort
 According to the `gbm` package vignette, if the data is sorted in a systematic way, then the data should be shuffled before running `gbm`.
 
 ```{r}
+# Correction: Randomly shuffle the data before fitting GBM model
 set.seed(1000)
 d2 <- read_dta("data/g3aca1.dta") %>%
   haven::zap_formats() %>%
@@ -154,6 +169,8 @@ d2 <- read_dta("data/g3aca1.dta") %>%
 The `gbm::gbm()` function has many arguments that can be fine-tuned. See `?gbm` for a detailed description of each argument.
 
 A summary of the fitted model provides us with *relative influence*, which is the percentage of log likelihood explained by each input variable.
+
+The GBM showed that `blck` had the strongest influence on the likelihood function (33.7%), followed by `ageyc` (16.3%) and `draggr2` (9.4%).
 
 ```{r message=F, fig.width=6, fig.height=3.5, fig.align="center"}
 # Correction: Remove the column of random numbers from the formula
@@ -181,6 +198,8 @@ head(psb)
 
 \newpage
 ## Plot Propensity Score Distributions
+
+As seen in the figure below, the propensity scores estimated by GBM has sufficient overlap between the control and treatment groups (i.e., "common support"), and the distributions are similar.
 
 ```{r fig.width=6, fig.height=3.5, fig.align="center"}
 d2 %>%
@@ -242,6 +261,10 @@ m5.alt <- WeightIt::weightit(
 
 \newpage
 ## Check Imbalance with the Cobalt Package
+
+The standardized mean difference (SMD) is a commonly used balance measure. It is calculated as the difference in means of a covariate across the treatment groups, divided by the standard deviation in the treated group. Stuart et al. (2013) recommend 0.1 or 0.25 as reasonable cut-offs for acceptable standardized biases.^[Stuart, E. A., Lee, B. K., & Leacy, F. P. (2013). Prognostic score–based balance measures for propensity score methods in comparative effectiveness research. *Journal of Clinical Epidemiology*, 66(8 0), S84-S90.e1. https://doi.org/10.1016/j.jclinepi.2013.01.013]
+
+Using the more stringent 0.1 cut-off point, it can be seen below that balance has been achieved in most, but not all, of the covariates:
 
 ```{r message=F, fig.width=6, fig.height=3.5, fig.align="center"}
 cobalt::love.plot(m5.alt, thresholds = c(m = .1), binary = "std", abs = T) +
