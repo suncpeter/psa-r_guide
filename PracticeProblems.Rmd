@@ -1,15 +1,30 @@
 ---
 title: "Practice Problems in R"
 author: "Peter Sun"
-date: "September, 2021"
-output: word_document
+date: "September 30-31, 2021"
+output:
+  pdf_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 4
+header-includes:
+- \usepackage{float}
+- \usepackage{pdflscape}
+- \usepackage{threeparttable}
+- \usepackage{threeparttablex}
+- \usepackage{pgfornament}
+- \usepackage{mathtools}
+- \usepackage{amsmath,amsthm,amssymb}
+- \newcommand{\blandscape}{\begin{landscape}}
+- \newcommand{\elandscape}{\end{landscape}}
 ---
 
-# Practice 1
+\newpage
+# Practice 1: Generalized Boosted Regression and Propensity Score Weighting
 
 ## Problem 1: Generalized Boosted Regression
 
-### Load Packages and Data
+### Load Packages
 
 ```{r message=F, warning=F, error=F}
 library(tidyverse)
@@ -19,23 +34,21 @@ library(lmtest)
 library(gbm)
 library(modelr)
 library(broom)
-library(flextable)
 library(sandwich)
 library(cobalt)
 library(WeightIt)
 library(Matching)
+library(kableExtra)
 select <- dplyr::select
-knitr::opts_chunk$set(dpi = 300, fig.width = 7)
+```
 
+### Load and Randomly Shuffle Data
+
+```{r}
 d <- read_dta("data/ldw_exper.dta") %>%
   haven::zap_formats() %>%
   sjlabelled::remove_all_labels() %>%
   as_tibble()
-```
-
-### Sort Data
-
-```{r}
 set.seed(1000)
 d2 <- d %>%
   add_column(runif = runif(nrow(.))) %>%
@@ -47,25 +60,24 @@ d2 <- d %>%
 ```{r message=F}
 set.seed(1000)
 m1 <- gbm::gbm(formula = t ~ age + educ + black + hisp + married + re74 +
-                 re75 + u74 + u75,
-          data = d2,
-          distribution = "bernoulli",
-          n.trees = 1000,
-          train.fraction = 0.8,
-          interaction.depth = 4,
-          shrinkage = 0.0005)
+                         re75 + u74 + u75,
+               data = d2,
+               distribution = "bernoulli",
+               n.trees = 1000,
+               train.fraction = 0.8,
+               interaction.depth = 4,
+               shrinkage = 0.0005)
 
-# Add Predictions to Data
+# Estimate Propensity Scores and Obtain Summary Statistics
 d3 <- d2 %>%
   modelr::add_predictions(m1, var = "psb", type = "response")
-
-# Summary of Propensity Scores
 summary(d3$psb)
 ```
 
-### Plot Histogram
+\newpage
+### Histograms of Propensity Scores
 
-```{r}
+```{r fig.width=6, fig.height=3.5, fig.align="center"}
 d3 %>%
   mutate(t = factor(t, labels = c("Control", "Treatment"))) %>%
   ggplot(aes(x = psb, color = t)) + 
@@ -78,9 +90,10 @@ d3 %>%
   facet_wrap(~ t)
 ```
 
-### Plot Boxplot
+\newpage
+### Boxplots of Propensity Scores
 
-```{r}
+```{r fig.width=6, fig.height=3.5, fig.align="center"}
 d3 %>%
   mutate(t = factor(t, labels = c("Control", "Treatment"))) %>%
   ggplot(aes(x = t, y = psb, color = t, fill = t)) + 
@@ -93,17 +106,16 @@ d3 %>%
 ```
 
 \newpage
-
 ## Problem 2: Propensity Score Weighting
 
-### Create ATE and ATT Weights
+### Estimate ATE and ATT Weights
 
 ```{r message=FALSE, warning=FALSE}
 d4 <- d3 %>%
   mutate(ate_w = ifelse(t == 0, 1/(1-psb), 1/psb),
          att_w = ifelse(t == 0, psb/(1-psb), 1))
 
-# Import Stata-generated weights to replicate results
+# Import Stata-generated weights to replicate Stata results
 stata_weights <- read_dta("data/ldw1.dta") %>%
   haven::zap_formats() %>%
   sjlabelled::remove_all_labels() %>%
@@ -116,37 +128,34 @@ d5 <- d4 %>%
   left_join(stata_weights, by = "id")
 ```
 
-### PSW With ATE and ATT Weights
+### Outcome Analysis with ATE and ATT Weights
 
 ```{r message=FALSE, warning=FALSE}
 # Define outcome formula
 f = as.formula(re78 ~ t + age + educ + black + hisp + married + re74 + re75 + 
            u74 + u75)
-```
 
-#### R-Generated Propensity Scores
-
-```{r message=FALSE, warning=FALSE}
+# Weighted OLS with R-Generated Propensity Scores
 m2 <- lm(f, data = d5, weights = ate_w)
-lmtest::coeftest(m2, vcov. = vcovHC(m2, "HC1")) # ATE
+tidy(lmtest::coeftest(m2, vcov. = vcovHC(m2, "HC1"))) %>% filter(term == "t") # ATE
 m3 <- lm(f, data = d5, weights = att_w) 
-lmtest::coeftest(m3, vcov. = vcovHC(m3, "HC1")) # ATT
-```
+tidy(lmtest::coeftest(m3, vcov. = vcovHC(m3, "HC1"))) %>% filter(term == "t") # ATT
 
-#### Stata-Generated Propensity Scores (Identical Results)
-
-```{r}
+# Weighted OLS with Stata-Generated Propensity Scores (Identical Results)
 m2.stata <- lm(f, data = d5, weights = stata_ate_w) 
-lmtest::coeftest(m2.stata, vcov. = vcovHC(m2.stata, "HC1")) # ATE
+tidy(lmtest::coeftest(m2.stata, vcov. = vcovHC(m2.stata, "HC1"))) %>% 
+  filter(term == "t") # ATE
 m3.stata <- lm(f, data = d5, weights = stata_att_w) 
-lmtest::coeftest(m3.stata, vcov. = vcovHC(m3.stata, "HC1")) # ATT
+tidy(lmtest::coeftest(m3.stata, vcov. = vcovHC(m3.stata, "HC1"))) %>% 
+  filter(term == "t") # ATT
 ```
 
+\newpage
 ### Check Imbalance
 
-Note that a custom function by Jorge Cimentada is used to replicate the robust standard errors in Stata.^[https://cimentadaj.github.io/blog/2016-09-19-obtaining-robust-standard-errors-and-odds-ratios/obtaining-robust-standard-errors-and-odds-ratios-for-logistic-regression-in-r/]
+See the Appendix for the custom function `robustse()` that is used to replicate the robust standard errors in Stata.
 
-```{r}
+```{r include=F}
 # Replicate Stata robust standard errors
 robustse <- function(x, coef = c("logit", "odd.ratio", "probs")) {
   suppressMessages(suppressWarnings(library(lmtest)))
@@ -172,7 +181,9 @@ robustse <- function(x, coef = c("logit", "odd.ratio", "probs")) {
     return(mod1)
   }
 }
+```
 
+```{r}
 # Function to Check Imbalance
 check_bal <- function(var, weight, type) {
   if(type == "categorical") {
@@ -199,11 +210,16 @@ check_bal <- function(var, weight, type) {
 }
 format_bal <- function(df) {
   df %>%
-    flextable() %>%
-    flextable::set_table_properties(width = 1, layout = "autofit") %>%
-    flextable::colformat_double(digits = 7)
+    filter(term != "(Intercept)") %>%
+    kbl(booktabs = T, digits = 7) %>%
+    kable_styling(position = "center") %>%
+    kable_styling(latex_options = c("striped", "HOLD_position"))
 }
+```
 
+\newpage
+
+```{r}
 # Categorical Variables
 cat_vars <- c("black", "hisp", "married", "u74", "u75")
 format_bal(map_dfr(cat_vars, check_bal, d5$stata_ate_w, "categorical"))
@@ -225,53 +241,59 @@ format_bal(map_dfr(cont_vars, check_bal, d5$ate_w, "continuous"))
 format_bal(map_dfr(cont_vars, check_bal, d5$att_w, "continuous"))
 ```
 
-### Alternative Solution with WeightIt
+\newpage
+### Alternative Solution with the WeightIt Package
 
-#### Use GBM to Generate ATE and ATT
+Use GBM to estimate ATE and ATT:
 
 ```{r}
+set.seed(1000)
 w1.out <- WeightIt::weightit(
   formula = t ~ age + educ + black + hisp + married + re74 +
                  re75 + u74 + u75,
-  data = d5,
+  data = d2,
   method = "gbm",
   distribution = "bernoulli",
   stop.method = "es.mean",
   n.trees = 1000,
+  nTrain = 0.8 * nrow(d2),
   interaction.depth = 4,
   shrinkage = 0.0005,
   estimand = "ATE")
+
+set.seed(1000)
 w2.out <- WeightIt::weightit(
   formula = t ~ age + educ + black + hisp + married + re74 +
                  re75 + u74 + u75,
-  data = d5,
+  data = d2,
   method = "gbm",
   distribution = "bernoulli",
   stop.method = "es.mean",
   n.trees = 1000,
+  nTrain = 0.8 * nrow(d2),
   interaction.depth = 4,
   shrinkage = 0.0005,
   estimand = "ATT")
 ```
 
-#### Assess Balance with the Cobalt Package
+Assess balance with the cobalt package:
 
-```{r}
-cobalt::love.plot(w1.out, thresholds = c(m = .1), binary = "std") +
+```{r fig.width=6, fig.height=3.5, fig.align="center"}
+cobalt::love.plot(w1.out, thresholds = c(m = .1), binary = "std", abs = T) +
   labs(title = "Covariate Balance (ATE)")
-cobalt::love.plot(w2.out, thresholds = c(m = .1), binary = "std") +
+cobalt::love.plot(w2.out, thresholds = c(m = .1), binary = "std", abs = T) +
   labs(title = "Covariate Balance (ATT)")
 ```
 
-#### Inference
-
-The ATE and ATT weights can be obtained with `w1.out$weights` (ATE) and `w2.out$weights` (ATT).
+For the outcome analysis, the ATE and ATT weights can be obtained with `w1.out$weights` (ATE) and `w2.out$weights` (ATT):
 
 ```{r}
-m2.weightit <- lm(f, data = d5, weights = w1.out$weights) 
-lmtest::coeftest(m2.weightit, vcov. = vcovHC(m2.weightit, "HC1"))
-m3.weightit <- lm(f, data = d5, weights = w2.out$weightit) 
-lmtest::coeftest(m3.weightit, vcov. = vcovHC(m3.weightit, "HC1"))
+m2.weightit <- lm(f, data = d2, weights = w1.out$weights) 
+tidy(lmtest::coeftest(m2.weightit, vcov. = vcovHC(m2.weightit, "HC1"))) %>%
+  filter(term == "t")
+m3.weightit <- lm(f, data = d2, weights = w2.out$weightit) 
+tidy(lmtest::coeftest(m3.weightit, vcov. = vcovHC(m3.weightit, "HC1"))) %>%
+  filter(term == "t")
 ```
 
 \newpage
@@ -292,7 +314,8 @@ p2.d <- read_dta("data/prac2.dta") %>%
 The homoscedasticity assumption is not valid (e.g., p-value of the test for `age97` is < .05), indicating that the conditional variance of the outcome variable was not constant across levels of child's age, therefore a robust estimation of variance is warranted.
 
 ```{r message=FALSE, warning=FALSE}
-p2.m0 <- lm(lwss97 ~ kuse + male + black + age97 + pcged97 + mratio96 + pcg_adc, data = p2.d)
+p2.m0 <- lm(lwss97 ~ kuse + male + black + age97 + pcged97 + mratio96 + pcg_adc, 
+            data = p2.d)
 get_bptest <- function(data, lm.model, var) {
   b <- lmtest::bptest(lm.model, as.formula(paste0("~", var)), 
                       data = data, studentize = F)
@@ -301,11 +324,13 @@ get_bptest <- function(data, lm.model, var) {
 }
 map_dfr(c("kuse", "male", "black", "age97", "pcged97", "mratio96", "pcg_adc"), 
         get_bptest, data = p2.d, lm.model = p2.m0) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = 1, layout = "autofit") %>%
-  flextable::colformat_double(digits = 2)
+  kbl(booktabs = T, digits = 2, linesep = "",
+      caption = "Results of Breusch-Pagan Tests for Heteroskedasticity") %>%
+  kable_styling(position = "center") %>%
+  kable_styling(latex_options = c("striped", "HOLD_position"))
 ```
 
+\newpage
 ## Matching Estimators
 
 ### Define Outcome (Y), Treatment Index (Tr), and Variables to Match On (X)
@@ -316,7 +341,7 @@ Tr <- p2.d$kuse
 X <- select(p2.d, male, black, age97, pcged97, mratio96, pcg_adc)
 ```
 
-### Get All Estimators
+### Define Function for Matching
 
 ```{r}
 get_match <- function(estimand, sample) {
@@ -329,6 +354,11 @@ get_match <- function(estimand, sample) {
     p = (1 - pnorm(abs(m$est[,1]/m$se))) * 2
   ))
 }
+```
+
+### Get All Estimators
+
+```{r}
 tribble(
   ~estimator, ~estimand, ~sample,
   "SATE", "ATE", T,
@@ -342,6 +372,40 @@ tribble(
   mutate(match = list(get_match(estimand, sample))) %>%
   tidyr::unnest_wider(match) %>%
   select(-estimand, -sample) %>%
-  flextable::flextable() %>%
-  flextable::set_table_properties(width = 1, layout = "autofit")
+  kbl(booktabs = T, linesep = "") %>%
+  kable_styling(position = "center") %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+```
+
+\newpage
+# Appendix: Replicating Stata's Robust Standard Errors
+
+Custom function by Jorge Cimentada that is used to replicate the robust standard errors in Stata:^[https://cimentadaj.github.io/blog/2016-09-19-obtaining-robust-standard-errors-and-odds-ratios/obtaining-robust-standard-errors-and-odds-ratios-for-logistic-regression-in-r/]
+
+
+```{r eval=F}
+robustse <- function(x, coef = c("logit", "odd.ratio", "probs")) {
+  suppressMessages(suppressWarnings(library(lmtest)))
+  suppressMessages(suppressWarnings(library(sandwich)))
+
+  sandwich1 <- function(object, ...) {
+    sandwich(object) *
+      nobs(object) / (nobs(object) - 1)
+  }
+  # Function calculates SE's
+  mod1 <- coeftest(x, vcov = sandwich1)
+  # apply the function over the variance-covariance matrix
+
+  if (coef == "logit") {
+    return(mod1) # return logit with robust SE's
+  } else if (coef == "odd.ratio") {
+    mod1[, 1] <- exp(mod1[, 1]) # return odd ratios with robust SE's
+    mod1[, 2] <- mod1[, 1] * mod1[, 2]
+    return(mod1)
+  } else {
+    mod1[, 1] <- (mod1[, 1] / 4) # return probabilites with robust SE's
+    mod1[, 2] <- mod1[, 2] / 4
+    return(mod1)
+  }
+}
 ```
