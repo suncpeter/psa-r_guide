@@ -1,0 +1,249 @@
+---
+title: "Propensity Score Weighting and Generalized Boosted Regression in R"
+author: "Peter Sun"
+date: "September 30, 2021"
+output:
+  pdf_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 4
+header-includes:
+- \usepackage{float}
+- \usepackage{pdflscape}
+- \usepackage{threeparttable}
+- \usepackage{threeparttablex}
+- \usepackage{pgfornament}
+- \usepackage{mathtools}
+- \usepackage{amsmath,amsthm,amssymb}
+- \newcommand{\blandscape}{\begin{landscape}}
+- \newcommand{\elandscape}{\end{landscape}}
+---
+
+\newpage
+# Load Packages
+
+Stata DTA files can be imported directly into R using the `haven` and `sjlabelled` packages. 
+
+Propensity score weighting can be accomplished with base R. However, we need the `lmtest` and `sandwich` packages to estimate clustered covariance matrices in this example. Using these packages, we can obtain estimates and standard errors that are identical to Stata's `regress` program.
+
+Generalized boosted regression requires the `gbm` package.
+
+Finally, the `tidyverse` package can be optionally loaded for its convenient data manipulation and plotting functions.
+
+```{r message=F, warning=F, error=F}
+library(tidyverse)
+library(haven)
+library(sjlabelled)
+library(lmtest)
+library(sandwich)
+library(gbm)
+```
+
+# Propensity Score Weighting
+
+## Load Data with Propensity Scores
+
+```{r}
+d <- read_dta("data/chpt5_2_original.dta") %>%
+  haven::zap_formats() %>%
+  sjlabelled::remove_all_labels() %>%
+  as_tibble()
+head(d$ps)
+```
+
+## Estimate ATE and ATT Weights
+
+Here we calculate separate weights for estimating the average treatment effect (ATE) and the average treatment effect for the treated (ATT).
+
+For ATE, the weight estimates are calculated as follows for the treatment group:
+
+$$
+\omega = \frac{1}{\hat{e}(x)}
+$$
+
+And for the control group:
+
+$$
+\omega = \frac{1}{1 - \hat{e}(x)}
+$$
+
+For ATT, the weight is 1 for a treated case. The weight for a comparison case is:
+
+$$
+\omega = \frac{\hat{e}(x)}{1 - \hat{e}(x)}
+$$
+
+```{r message=FALSE, warning=FALSE}
+d.weights <- d %>%
+  mutate(ate_w = ifelse(kuse == 0, 1/(1-ps), 1/ps),
+         att_w = ifelse(kuse == 0, ps/(1-ps), 1))
+```
+
+## Outcome Analysis
+
+### Weighted Regression with ATE Weights
+
+After creating the weights, use the `weights` argument in `lm()` to run a weighted outcome analysis and `lmtest::coeftest()` to control for clustering effects.
+
+This analysis showed that children who used Aid to Families With Dependent Children (AFDC) had an average letter-word identification score that was 5.16 points lower than children who never used AFDC, $p < .01$.
+
+```{r message=FALSE, warning=FALSE}
+m3 <- lm(lwss97 ~ kuse + male + black + age97 + pcged97 + mratio96, 
+         data = d.weights, weights = ate_w) 
+lmtest::coeftest(m3, vcov. = vcovCL(m3, cluster = d.weights$pcg_id))
+```
+
+### Weighted Regression with ATT Weights
+
+When considering only individuals assigned to the treatment condition, children who used AFDC had an average letter-word identification score that was 4.62 points lower than children who never used AFDC, $p < .01$.
+
+```{r message=FALSE, warning=FALSE}
+m4 <- lm(lwss97 ~ kuse + male + black + age97 + pcged97 + mratio96, 
+         data = d.weights, weights = att_w)
+lmtest::coeftest(m4, vcov. = vcovCL(m4, cluster = d.weights$pcg_id))
+```
+
+## Check Imbalance
+
+To assess balance before and after propensity score weighting, use logistic regression for dummy covariates and OLS regression for continuous covariates. Some examples are included below, and the full code can be found in Section 7.3.1 of the PSA-R code.
+
+In model `c5` below, the treatment dummy variable is significant, meaning that there is no sufficient balance after the propensity score weighting.
+
+To assess balance before propensity score weighting, remove the `weights` argument.
+
+```{r}
+c1 <- glm(male ~ kuse, family = quasibinomial, data = d.weights, weights = ate_w)
+lmtest::coeftest(c1, vcov. = vcovCL(c1, cluster = d.weights$pcg_id))
+c2 <- glm(male ~ kuse, family = quasibinomial, data = d.weights, weights = att_w)
+lmtest::coeftest(c2, vcov. = vcovCL(c2, cluster = d.weights$pcg_id))
+
+c5 <- lm(age97 ~ kuse, weights = ate_w, data = d.weights)
+lmtest::coeftest(c5, vcov. = vcovCL(c5, cluster = d.weights$pcg_id))
+c6 <- lm(age97 ~ kuse, weights = att_w, data = d.weights)
+lmtest::coeftest(c6, vcov. = vcovCL(c6, cluster = d.weights$pcg_id))
+```
+
+\newpage
+# Estimate Propensity Scores Using Generalized Boosted Regression
+
+## Load Data and Sort
+
+Generalized boosted regression (GBR) is an iterative method for creating propensity scores. Therefore, to create reproducible results, we need to use the `set.seed()` function in R.
+
+After importing the data, missing data is deleted listwise, and the data is sorted in a random order. Note the use of the `set.seed()` function to create the same set of random numbers from the uniform distribution.
+
+According to the `gbm` package vignette, if the data is sorted in a systematic way, then the data should be shuffled before running `gbm`.
+
+```{r}
+set.seed(1000)
+d2 <- read_dta("data/g3aca1.dta") %>%
+  haven::zap_formats() %>%
+  sjlabelled::remove_all_labels() %>%
+  as_tibble() %>%
+  select(intbl, ageyc, fmale, blck, whit, hisp, pcedu, ipovl, pcemft, fthr,
+         dicsagg2, dicsint2, dccereg2, dccscom2, dccpros2, draggr2) %>%
+  drop_na() %>%
+  add_column(runif = runif(nrow(.))) %>%
+  arrange(runif)
+```
+
+## Generate Propensity Scores
+
+## Fit Generalized Boosted Regression Model
+
+The `gbm::gbm()` function has many arguments that can be fine-tuned. See `?gbm` for a detailed description of each argument.
+
+A summary of the fitted model provides us with *relative influence*, which is the percentage of log likelihood explained by each input variable.
+
+```{r message=F, fig.width=6, fig.height=3.5, fig.align="center"}
+# Correction: Remove the column of random numbers from the formula
+f5 <- as.formula(paste("intbl ~ ", paste(names(select(d2, -intbl, -runif)), 
+                                         collapse = " + ")))
+set.seed(1000)
+m5 <- gbm::gbm(formula = f5,
+          data = d2,
+          distribution = "bernoulli",
+          n.trees = 1000, # number of trees to fit
+          train.fraction = 0.8, # a random 80% subsample for estimation
+          interaction.depth = 4, # allow all four-way interactions
+          shrinkage = 0.0005) # small shrinkage to ensure smooth fit
+summary(m5)
+```
+
+## Estimate Propensity Scores
+
+After fitting the model, propensity scores can be generated by using the `predict.gbm()` function.
+
+```{r}
+psb <- gbm::predict.gbm(m5, data = d2, type = "response") # Create ps
+head(psb)
+```
+
+\newpage
+## Plot Propensity Score Distributions
+
+```{r fig.width=6, fig.height=3.5, fig.align="center"}
+d2 %>%
+  mutate(psb = psb,
+         intbl = factor(intbl, labels = c("Control", "Treatment"))) %>%
+  ggplot(aes(x = psb, color = intbl)) + theme_classic() +
+  geom_density(size = 1) + xlim(0, 1) + ylim(0, 22) +
+  labs(x = "Predicted Probability", y = "Density",
+       title = "Propensity Scores Using Generalized Boosted Regression", 
+       color = "Treatment") +
+  theme(legend.position = c(0.9, 0.85))
+```
+
+## Summary Statistics of Propensity Scores
+
+```{r}
+summary(psb)
+```
+
+\newpage
+# Bonus: Using the WeightIt Package
+
+## Estimate ATE and ATT Weights
+
+```{r message=F, fig.width=6, fig.height=3.5, fig.align="center"}
+# Load Packages
+library(WeightIt)
+library(cobalt)
+
+# Estimate ATE and ATT weights and Check with Previous Results
+ate_w2 <- WeightIt::get_w_from_ps(ps = d$ps,
+                                  treat = d$kuse,
+                                  estimand = "ATE")
+table(ate_w2 == d.weights$ate_w)
+att_w2 <- WeightIt::get_w_from_ps(ps = d$ps,
+                                  treat = d$kuse,
+                                  estimand = "ATT")
+table(att_w2 == (d.weights$ate_w * d.weights$ps))
+```
+
+## Estimate Propensity Scores using Generalized Boosted Regression
+
+```{r message=F, fig.width=6, fig.height=3.5, fig.align="center"}
+# Estimate PS with GBM
+set.seed(1000)
+m5.alt <- WeightIt::weightit(
+  formula = f5,
+  data = d2,
+  method = "gbm",
+  estimand = "ATE",
+  distribution = "bernoulli",
+  stop.method = "es.mean",
+  n.trees = 10000, # different
+  nTrain = 0.8 * nrow(d2), # different
+  interaction.depth = 4,
+  shrinkage = 0.0005
+)
+```
+
+\newpage
+## Check Imbalance with the Cobalt Package
+
+```{r message=F, fig.width=6, fig.height=3.5, fig.align="center"}
+cobalt::love.plot(m5.alt, thresholds = c(m = .1), binary = "std", abs = T) +
+  labs(title = "Covariate Balance (ATE)")
+```
