@@ -206,7 +206,7 @@ The `Matching::Match()` function works well in conjunction with the `cobalt::bal
 # Covariate Balance for SATE
 SATE <- Match(Y = Y, Tr = Tr, X = X, M = 4, BiasAdjust = T, Var.calc = 4,
               estimand = "ATE", sample = T)
-bal.tab(SATE, kuse ~ male + black + age97 + pcged97 + mratio96, data = d, 
+bal.tab(SATE, kuse ~ male + black + age97 + pcged97 + mratio96 + pcg_adc, data = d, 
         abs = T,
         un = T,
         thresholds = c(m = .1))
