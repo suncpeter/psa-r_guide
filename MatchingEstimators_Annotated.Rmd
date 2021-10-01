@@ -1,0 +1,213 @@
+---
+title: "Matching Estimators in R"
+author: "Peter Sun"
+date: "September 31, 2021"
+output:
+  pdf_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 4
+header-includes:
+- \usepackage{float}
+- \usepackage{pdflscape}
+- \usepackage{threeparttable}
+- \usepackage{threeparttablex}
+- \usepackage{pgfornament}
+- \usepackage{mathtools}
+- \usepackage{amsmath,amsthm,amssymb}
+- \newcommand{\blandscape}{\begin{landscape}}
+- \newcommand{\elandscape}{\end{landscape}}
+---
+
+\newpage
+# Load Packages
+
+The Breusch-Pagan test against heteroskedasticity requires the `lmtest` package, and a variety of matching estimators are implemented in the `Matching` package.
+
+```{r message=F, warning=F, error=F}
+library(tidyverse)
+library(haven)
+library(lmtest)
+library(Matching)
+library(kableExtra)
+library(cobalt)
+select <- dplyr::select
+```
+
+# Description of Dataset
+
+This example uses the 1997 Child Development Supplement (CDS) to the Panel Study of Income Dynamics (PSID) and the core PSID annual data from 1968 to 1997.
+
+The dependent variable in this dataset is `pcss97`, a passage comprehension score. Higher scores on this measure indicate higher academic achievement. The treatment variable is `kuse` or children who ever used Aid to Families With Dependent Children (AFDC). The covariates or matching variables are:
+
+- `male`: Child's Gender: Male (Reference: Female)
+- `black`: Child's Race: African American (Reference: Other)
+- `age97`: Child's Age in 1997
+- `pcged97`: Caregiver's Education in 1997 (Years of Schooling)
+- `mratio96`: Ratio of Family Income to Poverty Line in 1996
+- `pcg_adc`: Caregiver's History of Using Welfare (Number of Years)
+
+# Load Data
+
+```{r}
+d <- read_dta("data/cds_pcss97.dta") %>%
+  haven::zap_formats() %>%
+  sjlabelled::remove_all_labels() %>%
+  as_tibble()
+head(d) %>%
+  kbl(booktabs = T, linesep = "", digits = 2) %>%
+  kable_styling(position = "center") %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+```
+
+\newpage
+# Breusch-Pagan Test for Heteroskedasticity
+
+The homoskedastic variance estimator assumes that the unit-level treatment effect is constant and that the conditoinal variance of $Y_i(w)$ given $X_i$ does not vary with either covariates or the treatment. The Breusch-Pagan test is performed for each of the seven independent variables and showed that child's age was statistically significant, $p < .01$, indicating that the conditional variance of the dependent variable was not constant across levels of child's age. Therefore, the robust variance estimator should be used in the next stage to allow for heteroskedasticity.
+
+```{r message=FALSE, warning=FALSE}
+# Regress outcome on treatment and matching variables using OLS
+m0 <- lm(pcss97 ~ kuse + male + black + age97 + pcged97 + mratio96 + pcg_adc, data = d)
+
+# Function for Bresuch-Pagan test
+get_bptest <- function(data, lm.model, var) {
+  b <- lmtest::bptest(
+    lm.model, 
+    as.formula(paste0("~", var)), 
+    data = data,
+    studentize = F
+  )
+  return(
+    tibble(
+      variable = var,
+      statistic = b$statistic, 
+      df = b$parameter,
+      p.value = b$p.value
+    )
+  )
+}
+
+# Get results from Bresuch-Pagan test
+map_dfr(
+  c("kuse", "male", "black", "age97", "pcged97", "mratio96", "pcg_adc"), 
+  get_bptest,
+  data = d,
+  lm.model = m0
+) %>%
+  kbl(booktabs = T, linesep = "", 
+      caption = "Breusch-Pagan Test Results") %>%
+  kable_styling(position = "center") %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+```
+
+# Matching Estimators
+
+Of the six matching variables, four are continuous and two are categorical, therefore bias-corrected matching estimator is necessary to correct for bias corresponding to the matching discrepancies between matched units and their matches on the four continuous covariates. Regression adjustment can be used with the `BiasAdjust = T` argument.
+
+By default, the `Matching::Match()` function uses the matching variables to make bias adjustments. However, these covariates can be specified using the `Z` argument (example shown below).
+
+If `Var.calc = 0`, then homoskedasticity is assumed. Use `Var.calc = 4` to request the robust variance estimator using four matches.
+
+The `estimand` argument is by default "ATT," but can be set to the "ATE" or "ATC". The `sample` argument is a logical flag for whether the population or sample variance is returned.
+
+Results from the `Matching::Match()` function are identical to Stata's `nnmatch` program.
+
+## Define Outcome (Y), Treatment Index (Tr), and Variables to Match On (X)
+
+```{r}
+Y <- d$pcss97
+Tr <- d$kuse
+X <- select(d, male, black, age97, pcged97, mratio96, pcg_adc)
+```
+
+## Get Estimators Individually
+
+Note that by default matching is done with replacement. However, this can be changed with the `replace` logical flag.
+
+```{r eval=F}
+# Sample Average Treatment Effect (SATE)
+summary(Match(Y = Y, Tr = Tr, X = X, M = 4, BiasAdjust = T, Var.calc = 4,
+              estimand = "ATE", sample = T, replace = T)) # replace = T is default
+
+# Population Average Treatment Effect (PATE)
+summary(Match(Y = Y, Tr = Tr, X = X, M = 4, BiasAdjust = T, Var.calc = 4,
+              estimand = "ATE", sample = F))
+
+# Sample average treatment effect for the treated (SATT)
+summary(Match(Y = Y, Tr = Tr, X = X, M = 4, BiasAdjust = T, Var.calc = 4,
+              estimand = "ATT", sample = T))
+
+# Population average treatment effect for the treated (PATT)
+summary(Match(Y = Y, Tr = Tr, X = X, M = 4, BiasAdjust = T, Var.calc = 4,
+              estimand = "ATT", sample = F))
+
+# Sample average treatment effect for the controls (SATC)
+summary(Match(Y = Y, Tr = Tr, X = X, M = 4, BiasAdjust = T, Var.calc = 4,
+              estimand = "ATC", sample = T))
+
+# Population average treatment effect for the controls (PATC)
+summary(Match(Y = Y, Tr = Tr, X = X, M = 4, BiasAdjust = T, Var.calc = 4,
+              estimand = "ATC", sample = F))
+```
+
+## Get All Estimators
+
+```{r}
+# Function for extracting estimate, SE, t-stat, and p-value from Match()
+get_match <- function(estimand, sample, Z = X) {
+  m <- Match(Y = Y, Tr = Tr, X = X, M = 4, BiasAdjust = TRUE, Var.calc = 4,
+              estimand = estimand, sample = sample)
+  return(list(
+    est = m$est[,1],
+    se = m$se,
+    t.stat = m$est[,1]/m$se,
+    p = (1 - pnorm(abs(m$est[,1]/m$se))) * 2
+  ))
+}
+
+# Estimate different matching estimators
+tribble(
+  ~estimator, ~estimand, ~sample,
+  "SATE", "ATE", T,
+  "PATE", "ATE", F,
+  "SATT", "ATT", T,
+  "PATT", "ATT", F,
+  "SATC", "ATC", T,
+  "PATC", "ATC", F
+) %>%
+  rowwise() %>%
+  mutate(match = list(get_match(estimand, sample))) %>%
+  unnest_wider(match) %>%
+  select(-estimand, -sample) %>%
+  kbl(booktabs = T, linesep = "",
+      caption = "Bias-Corrected Matching Estimators with Robust Standard Errors") %>%
+  kable_styling(position = "center") %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+```
+
+When looking at the ATE, the results suggest that childhood poverty strongly affected children's academic achievement. Children who used AFDC had a passage comprehension score 4.7 units lower than that of children who never used AFDC. When considering only the treated population, this treatment effect was much larger. 
+
+\newpage
+## Specify Variables in the Bias-Corrected Matching
+
+```{r}
+# Sample Average Treatment Effect (SATE)
+Z <- select(d, age97, pcged97, mratio96, pcg_adc) # Covariates for bias adj.
+summary(Match(Y = Y, Tr = Tr, X = X, Z = Z, M = 4, 
+              BiasAdjust = T, Var.calc = 4, estimand = "ATE", sample = T))
+```
+
+\newpage
+# Bonus: Check Covariate Balance
+
+The `Matching::Match()` function works well in conjunction with the `cobalt::bal.tab()` function for checking covariate balance.
+
+```{r}
+# Covariate Balance for SATE
+SATE <- Match(Y = Y, Tr = Tr, X = X, M = 4, BiasAdjust = T, Var.calc = 4,
+              estimand = "ATE", sample = T)
+bal.tab(SATE, kuse ~ male + black + age97 + pcged97 + mratio96, data = d, 
+        abs = T,
+        un = T,
+        thresholds = c(m = .1))
+```
