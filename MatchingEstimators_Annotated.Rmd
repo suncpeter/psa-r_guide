@@ -202,6 +202,8 @@ summary(Match(Y = Y, Tr = Tr, X = X, Z = Z, M = 4,
 
 The `Matching::Match()` function works well in conjunction with the `cobalt::bal.tab()` function for checking covariate balance.
 
+By default, the denominator for standardized mean differences uses a pooled estimate (square root of the average of the group variances) for ATE and the standard deviation of the treated group for ATT---both standard deviations are computed using the sample before matching. This option can also be manually set with the `s.d.denom` option.
+
 ```{r}
 # Covariate Balance for SATE
 SATE <- Match(Y = Y, Tr = Tr, X = X, M = 4, BiasAdjust = T, Var.calc = 4,
@@ -209,5 +211,6 @@ SATE <- Match(Y = Y, Tr = Tr, X = X, M = 4, BiasAdjust = T, Var.calc = 4,
 bal.tab(SATE, kuse ~ male + black + age97 + pcged97 + mratio96 + pcg_adc, data = d, 
         abs = T,
         un = T,
-        thresholds = c(m = .1))
+        thresholds = c(m = .1),
+        s.d.denom = "pooled")
 ```
