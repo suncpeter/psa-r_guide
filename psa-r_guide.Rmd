@@ -197,7 +197,7 @@ threshold = .1
 
 By default, the `MatchIt::matchit()` function performs greedy nearest neighbor matching without replacement, therefore the `method = "nearest"` and `replace = F` arguments do not need to be specified.
 
-To avoid dissimilar matches, we can constrain matches so that only if the absolute distance of propensity scores between two participants is less than a specified tolerance for matching or a caliper. The width of the caliper is by default in standard deviation units and can be specified using the `caliper` argument. A wide caliper may result in more matches and a larger sample, but inexact matching may occur as indicated by large distances on the propensity score between the treated and nontreated cases. Using varying caliper sizes can test the sensitivity of the findings. Here we use a caliper size of a quarter of a standard deviation, which is suggested by Rosenbaum and Rubin (1985).
+To avoid dissimilar matches, we can constrain matches so that the absolute distance of propensity scores between two participants is less than a specified tolerance for matching or a caliper. The width of the caliper is by default in standard deviation units and can be specified using the `caliper` argument. A wide caliper may result in more matches and a larger sample, but inexact matching may occur as indicated by large distances on the propensity score between the treated and nontreated cases. Using varying caliper sizes can test the sensitivity of the findings. Here we use a caliper size of a quarter of a standard deviation, which is suggested by Rosenbaum and Rubin (1985).
 
 The order of the matching can be specified using the `m.order` argument. Finally, the logit of the predicted probability from a logistic regression model can be supplied to the `distance` argument. The logit of the predicted probability is used, because the logit is approximately normally distributed.
 
@@ -252,7 +252,7 @@ cobalt::bal.tab(gm_out, binary = "std", threshold = c(m = .1), un = T,
 \newpage
 ## Greedy Nearest Neighbor Mahalanobis Distance Matching Without Replacement
 
-Here we perform Mahalanobis distance matching without replacement and without including the estimated propensity score.
+Here we perform Mahalanobis distance matching without replacement and without including an estimated propensity score.
 
 ```{r}
 set.seed(1000)
