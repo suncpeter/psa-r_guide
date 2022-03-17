@@ -43,7 +43,7 @@ header-includes:
 
 ## Troubleshoot Package Errors
 
-If a line of code using a certain package is not working, try installing an older version of that package. See the output of my `sessionInfo()` below for package versions that are known to be compatible with the PSA-R code.
+If a line of code using a certain package is not working, try installing an older version of that package. See the output `sessionInfo()` below for package versions that are known to be compatible with the PSA-R code.
 
 As of March 16, 2022, the latest version of `PSweight` (1.1.6) will only work if line 142 in "08_Section6.5.2.Rmd" is changed from:
 
@@ -878,7 +878,9 @@ tidy(lmtest::coeftest(p12_m2_stata, vcov. = vcovHC(p12_m2_stata, "HC1"))) %>%
 
 ### Check Balance
 
-We can use logistic regression and OLS regression to check the balance of categorical and continuous covariates, respectively:
+#### Hypothesis Tests
+
+We can use logistic regression and OLS regression to check the balance of categorical and continuous covariates, respectively:^[See Appendix A for the custom function `robustse()` that is used to replicate the robust standard errors in Stata.]
 
 ```{r eval=F}
 # Categorical Covariates
@@ -902,33 +904,9 @@ lmtest::coeftest(i6, vcov. = vcovHC(i6, "HC1"))
 lmtest::coeftest(i7, vcov. = vcovHC(i7, "HC1"))
 lmtest::coeftest(i8, vcov. = vcovHC(i8, "HC1"))
 lmtest::coeftest(i9, vcov. = vcovHC(i9, "HC1"))
-
-# Alternative Hypothesis Tests
-library(survey)
-i.svy <- survey::svydesign(~1, weights = p12_df$stata_ate_w, data = p12_df)
-survey::svychisq(~black + t, design = i.svy)
-survey::svychisq(~hisp + t, design = i.svy)
-survey::svychisq(~married + t, design = i.svy)
-survey::svychisq(~u74 + t, design = i.svy)
-survey::svychisq(~u75 + t, design = i.svy)
-survey::svyttest(age ~ t, design = i.svy)
-survey::svyttest(educ ~ t, design = i.svy)
-survey::svyttest(re74 ~ t, design = i.svy)
-survey::svyttest(re75 ~ t, design = i.svy)
-
-# Standardized Mean Differences
-cobalt::bal.tab(
-  p12_df %>% select(black, hisp, married, u74, u75, age, educ, re74, re75),
-  treat = p12_df$t,
-  weights = p12_df$stata_ate_w,
-  abs = T,
-  s.d.denom = "pooled"
-)
 ```
 
 \newpage
-
-Function to check balance for all of the covariates (see the Appendix for the custom function `robustse()` that is used to replicate the robust standard errors in Stata):
 
 ```{r include=F}
 # Replicate Stata robust standard errors
@@ -959,60 +937,66 @@ robustse <- function(x, coef = c("logit", "odd.ratio", "probs")) {
 ```
 
 ```{r}
-# Function to Check Balance
-check_bal <- function(var, weight, type) {
-  if (type == "categorical") {
-    m <- glm(as.formula(paste0(var, "~t")),
-      family = quasibinomial,
-      data = p12_df,
-      weights = weight
-    )
-    m %>%
-      tidy() %>%
-      mutate(odds.ratio = exp(estimate), variable = var) %>%
-      mutate(or.se = robustse(m, coef = "odd.ratio")[, 2]) %>%
-      mutate(statistic = robustse(m, coef = "odd.ratio")[, 3]) %>%
-      mutate(p.value = robustse(m, coef = "odd.ratio")[, 4]) %>%
-      select(variable, term, odds.ratio, or.se, statistic, p.value)
-  } else if (type == "continuous") {
-    m <- lm(as.formula(paste0(var, "~t")),
-      data = p12_df,
-      weights = weight
-    )
-    lmtest::coeftest(m, vcov. = vcovHC(m, "HC1")) %>%
-      tidy() %>%
-      add_column(var, .before = "term")
-  }
-}
-format_bal <- function(df) {
-  df %>%
-    filter(term != "(Intercept)") %>%
-    kbl(booktabs = T, digits = 7) %>%
-    kable_styling(position = "center") %>%
-    kable_styling(latex_options = c("striped", "HOLD_position"))
-}
+# Hypothesis testing for categorical covariates
+p12_df %>%
+  select(black, hisp, married, u74, u75, ate_w:stata_att_w, t) %>%
+  pivot_longer(black:u75, names_to = "cat_covs", values_to = "cat_val") %>%
+  pivot_longer(ate_w:stata_att_w, names_to = "estimand", values_to = "weight") %>%
+  group_by(estimand, cat_covs) %>%
+  nest() %>%
+  mutate(p.value = map(data, ~robustse(
+    glm(.$cat_val ~ .$t, family = quasibinomial, weights = .$weight),
+    coef = "odd.ratio")[2,4])) %>%
+  unnest(p.value) %>%
+  ungroup() %>%
+  select(-data)
+
+# Hypothesis testing for continuous covariates
+p12_df %>%
+  select(age, educ, re74, re75, ate_w:stata_att_w, t) %>%
+  pivot_longer(age:re75, names_to = "cont_covs", values_to = "cont_val") %>%
+  pivot_longer(ate_w:stata_att_w, names_to = "estimand", values_to = "weight") %>%
+  group_by(estimand, cont_covs) %>%
+  nest() %>%
+  mutate(lm = map(data, ~lm(.$cont_val ~ .$t, weights = .$weight)),
+         p.value = map(lm, ~lmtest::coeftest(., vcov. = vcovHC(., "HC1"))[2,4])) %>%
+  unnest(p.value) %>%
+  ungroup() %>%
+  select(-data, -lm)
 ```
 
-```{r}
-# Categorical Variables
-cat_vars <- c("black", "hisp", "married", "u74", "u75")
-format_bal(map_dfr(cat_vars, check_bal, p12_df$stata_ate_w, "categorical"))
-format_bal(map_dfr(cat_vars, check_bal, p12_df$stata_att_w, "categorical"))
-
-# Continuous Variables
-cont_vars <- c("age", "educ", "re74", "re75")
-format_bal(map_dfr(cont_vars, check_bal, p12_df$stata_ate_w, "continuous"))
-format_bal(map_dfr(cont_vars, check_bal, p12_df$stata_att_w, "continuous"))
-```
-
-Similar results can be obtained using the R-generated propensity score weights:
+The `survey` package can also be used to incorporate weights:
 
 ```{r eval=F}
-# With R-generated weights
-format_bal(map_dfr(cat_vars, check_bal, p12_df$ate_w, "categorical"))
-format_bal(map_dfr(cat_vars, check_bal, p12_df$att_w, "categorical"))
-format_bal(map_dfr(cont_vars, check_bal, p12_df$ate_w, "continuous"))
-format_bal(map_dfr(cont_vars, check_bal, p12_df$att_w, "continuous"))
+library(survey)
+i.svy <- survey::svydesign(~1, weights = p12_df$stata_ate_w, data = p12_df)
+survey::svychisq(~black + t, design = i.svy)
+survey::svychisq(~hisp + t, design = i.svy)
+survey::svychisq(~married + t, design = i.svy)
+survey::svychisq(~u74 + t, design = i.svy)
+survey::svychisq(~u75 + t, design = i.svy)
+survey::svyttest(age ~ t, design = i.svy)
+survey::svyttest(educ ~ t, design = i.svy)
+survey::svyttest(re74 ~ t, design = i.svy)
+survey::svyttest(re75 ~ t, design = i.svy)
+```
+
+\newpage
+#### Standardized Mean Differences
+
+Finally, the `cobalt` package can be used to check balance using standardized mean differences.^["The “effective sample size” (ESS) is a measure of the sample size a non-weighted sample would have to have to achieve the same level of precision as the weighted sample (Ridgeway 2006)" (https://cran.r-project.org/web/packages/cobalt/vignettes/cobalt.html#effective-sample-size-for-weighting)]
+
+```{r fig.width=6, fig.height=3.5, fig.align="center"}
+cobalt::bal.tab(
+  p12_df %>% select(black, hisp, married, u74, u75, age, educ, re74, re75),
+  treat = p12_df$t,
+  weights = p12_df$ate_w,
+  abs = T,
+  threshold = .1,
+  binary = "std",
+  s.d.denom = "pooled",
+  un = T
+)
 ```
 
 \newpage
