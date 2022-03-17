@@ -1,0 +1,1213 @@
+---
+title: "Propensity Score Analysis in R"
+author: "Peter Sun and Shenyang Guo"
+date: "March 17-19, 2022"
+output:
+  pdf_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 4
+header-includes:
+- \usepackage{float}
+- \usepackage{pdflscape}
+- \usepackage{threeparttable}
+- \usepackage{threeparttablex}
+- \usepackage{pgfornament}
+- \usepackage{mathtools}
+- \usepackage{amsmath,amsthm,amssymb}
+- \newcommand{\blandscape}{\begin{landscape}}
+- \newcommand{\elandscape}{\end{landscape}}
+---
+
+\newpage
+# How to Setup R and RStudio
+
+## Download R, RStudio, and PSA-R
+
+1. Download the latest version of R: https://www.r-project.org/
+2. Download the latest version of RStudio Desktop: https://www.rstudio.com/products/rstudio/download/
+3. Download the two PSA-R zip files under "R Syntax": https://ssw.unc.edu/psa/
+
+## Run the Code
+
+1. To view the code output without running it, extract the "PSA-R_Output.zip" file and open "index.html"
+2. To run an individual section:
+
+    - Extract "PSA-R_Code_Data.zip"
+    - Open "PSA-R.Rproj"
+    - Open the desired section code in the file browser (e.g., "01_Section4.4.1.Rmd")
+    - Install packages if necessary
+    - Click on "Run All"
+
+3. To knit the entire book into HTML output, click on "Build Book"
+
+## Troubleshoot Package Errors
+
+If a line of code using a certain package is not working, try installing an older version of that package. See the output of my `sessionInfo()` below for package versions that are known to be compatible with the PSA-R code.
+
+As of March 16, 2022, the latest version of `PSweight` (1.1.6) will only work if line 142 in "08_Section6.5.2.Rmd" is changed from:
+
+```{r eval=F}
+data = sur_subclass1,
+```
+
+to
+
+```{r eval=F}
+data = as.data.frame(sur_subclass1),
+```
+
+An alternative solution is to install an older version of `PSweight` that works (1.1.2):
+
+```{r eval=F}
+packageVersion("PSweight")
+detach("package:PSweight", unload = T)
+remove.packages("PSweight")
+library(devtools)
+devtools::install_version("PSweight", version = "1.1.2",
+  repos = "http://cran.us.r-project.org")
+```
+
+## PSA-R Session Info
+
+The following output for `sessionInfo()` lists package versions that are known to be compatible with the PSA-R code (if the fix for `PSweight` above is implemented).
+
+```{r eval=F}
+R version 4.1.3 (2022-03-10)
+Platform: x86_64-w64-mingw32/x64 (64-bit)
+Running under: Windows 10 x64 (build 19043)
+
+Matrix products: default
+
+locale:
+[1] LC_COLLATE=English_United States.1252  LC_CTYPE=English_United States.1252   
+[3] LC_MONETARY=English_United States.1252 LC_NUMERIC=C                          
+[5] LC_TIME=English_United States.1252    
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base     
+
+loaded via a namespace (and not attached):
+ [1] tidyr_1.2.0            VGAM_1.1-6             splines_4.1.3          foreach_1.5.2         
+ [5] carData_3.0-5          gam_1.20.1             gtools_3.9.2           Formula_1.2-4         
+ [9] assertthat_0.2.1       stats4_4.1.3           coin_1.4-2             yaml_2.3.5            
+[13] numDeriv_2016.8-1.1    pillar_1.7.0           backports_1.4.1        lattice_0.20-45       
+[17] glue_1.6.2             digest_0.6.29          colorspace_2.0-3       sandwich_3.0-1        
+[21] gbm_2.1.8              htmltools_0.5.2        Matrix_1.4-0           pkgconfig_2.0.3       
+[25] broom_0.7.12           haven_2.4.3            gmodels_2.18.1         bookdown_0.25         
+[29] purrr_0.3.4            mvtnorm_1.1-3          scales_1.1.1           gdata_2.18.0          
+[33] tibble_3.1.6           generics_0.1.2         car_3.0-12             ggplot2_3.3.5         
+[37] sjlabelled_1.1.8       ellipsis_0.3.2         cobalt_4.3.2           TH.data_1.1-0         
+[41] nnet_7.3-17            maxLik_1.5-2           cli_3.2.0              survival_3.2-13       
+[45] magrittr_2.0.2         crayon_1.5.0           MatchIt_4.3.4          evaluate_0.15         
+[49] fansi_1.0.2            MASS_7.3-55            SuperLearner_2.0-28    forcats_0.5.1         
+[53] WeightIt_0.12.0        rsconnect_0.8.25       tools_4.1.3            hms_1.1.1             
+[57] mitools_2.4            multcomp_1.4-18        matrixStats_0.61.0     lifecycle_1.0.1       
+[61] munsell_0.5.0          systemfit_1.1-24       compiler_4.1.3         rlang_1.0.2           
+[65] grid_4.1.3             Matching_4.9-11        iterators_1.0.14       miscTools_0.6-26      
+[69] rbounds_2.1            rmarkdown_2.13         gtable_0.3.0           codetools_0.2-18      
+[73] abind_1.4-5            DBI_1.1.2              R6_2.5.1               nnls_1.4              
+[77] zoo_1.8-9              knitr_1.37             dplyr_1.0.8            fastmap_1.1.0         
+[81] utf8_1.2.2             libcoin_1.0-9          insight_0.16.0         sampleSelection_1.2-12
+[85] modeltools_0.2-23      parallel_4.1.3         Rcpp_1.0.8.2           vctrs_0.3.8           
+[89] tidyselect_1.1.2       xfun_0.30              PSweight_1.1.6         lmtest_0.9-39            
+```
+
+\newpage
+# Greedy Nearest Neighbor Matching
+
+## Load Packages
+
+The `haven` and `sjlabelled` packages are used to load and clean Stata data files (.dta); the `MatchIt` package contains functions for greedy matching; the `cobalt` package contains functions for balance checking; and the `tidyverse` package is loaded for its data manipulation functions.
+
+```{r message=F, warning=F, error=F}
+library(haven)
+library(sjlabelled)
+library(cobalt)
+library(MatchIt)
+library(tidyverse)
+library(kableExtra)
+```
+
+## Description of Dataset
+
+This dataset is a sample of 2,758 children from the National Survey of Child and Adolescent Well-Being (NSCAW). The treatment condition is `aodserv` or caregivers who received (aodserv = 1) or did not receive (aodserv = 0) substance abuse services. Two matching procedures are illustrated here. The full code contains 12 matching schemes and can be found in Section 5.8.1 of the PSA-R code.
+
+## Load Data and Sort
+
+```{r}
+set.seed(1000)
+gm_df <- haven::read_dta("data/chpt5_1_original.dta") %>%
+  haven::zap_formats() %>%
+  sjlabelled::remove_all_labels() %>%
+  as_tibble() %>%
+  add_column(runif = runif(nrow(.))) %>%
+  arrange(runif) %>%
+  select(-runif)
+```
+
+## Check Balance Before Matching
+
+Use `chisq.test` to  check balance before matching:
+
+```{r error=F, message=F, warning=F}
+gm_df %>%
+  select(married, educ, pov, employ, open, race, chdage, cgage, CRA47A, mental, 
+         arrest, PSH17A, maltx, ra, cidi, cgneed, cwwrep, aodserv) %>%
+  pivot_longer(-aodserv, names_to = "variable") %>%
+  group_by(variable) %>%
+  nest() %>%
+  mutate(bivariate.test = map(data, ~chisq.test(.$aodserv, .$value, correct = F))) %>%
+  mutate(statistic = map(bivariate.test, ~round(.$statistic, 3))) %>%
+  mutate(p.value = map(bivariate.test, ~round(.$p.value, 3))) %>%
+  unnest(cols = c(statistic, p.value)) %>%
+  select(variable, statistic, p.value)
+```
+
+Alternatively, the `cobalt` package provides several convenient functions for assessing balance.
+
+The standardized mean difference (SMD) is a commonly used balance measure. It is calculated as the difference in means of a covariate across the treatment groups, divided by the standard deviation in the treated group (ATT), the control group (ATC), or the pooled standard deviation (ATE). Stuart et al. (2013) recommend 0.1 or 0.25 as reasonable cut-offs for acceptable standardized biases.^[Stuart, E. A., Lee, B. K., & Leacy, F. P. (2013). Prognostic score–based balance measures for propensity score methods in comparative effectiveness research. *Journal of Clinical Epidemiology*, 66(8 0), S84-S90.e1. https://doi.org/10.1016/j.jclinepi.2013.01.013]
+
+```{r fig.width=6, fig.height=3.5, fig.align="center"}
+# Balance table
+bal.tab(select(
+  gm_df, married, educ, pov, employ, open, race, chdage, cgage, CRA47A,
+  mental, arrest, PSH17A, maltx, ra, cidi, cgneed, cwwrep
+),
+treat = gm_df$aodserv,
+s.d.denom = "treated",
+threshold = .1
+)
+
+# Love plot
+love.plot(select(
+  gm_df, married, educ, pov, employ, open, race, chdage, cgage, CRA47A,
+  mental, arrest, PSH17A, maltx, ra, cidi, cgneed, cwwrep
+),
+treat = gm_df$aodserv,
+binary = "std",
+s.d.denom = "treated",
+threshold = .1
+) +
+  labs(title = "Covariate Balance Before Matching")
+```
+
+\newpage
+## Greedy Nearest Neighbor Matching Without Replacement
+
+By default, the `MatchIt::matchit()` function performs greedy nearest neighbor matching without replacement, therefore the `method = "nearest"` and `replace = F` arguments do not need to be specified.
+
+To avoid dissimilar matches, we can constrain matches so that only if the absolute distance of propensity scores between two participants is less than a specified tolerance for matching or a caliper. The width of the caliper is by default in standard deviation units and can be specified using the `caliper` argument. A wide caliper may result in more matches and a larger sample, but inexact matching may occur as indicated by large distances on the propensity score between the treated and nontreated cases. Using varying caliper sizes can test the sensitivity of the findings. Here we use a caliper size of a quarter of a standard deviation, which is suggested by Rosenbaum and Rubin (1985).
+
+The order of the matching can be specified using the `m.order` argument. Finally, the logit of the predicted probability from a logistic regression model can be supplied to the `distance` argument. The logit of the predicted probability is used, because the logit is approximately normally distributed.
+
+```{r}
+# Logistic regression specification
+(gm_f <- cobalt::f.build("aodserv", select(gm_df, PSH17A:other, -aodserv)))
+
+# Calculate the logit of the predicted probability as the propensity score
+gm_psm <- glm(gm_f, data = gm_df, family = binomial)
+gm_ps <- predict(gm_psm, newdata = gm_df, type = "response")
+gm_ps_logit <- log((1 - gm_ps) / gm_ps)
+
+# Greedy nearest neighbor matching without replacement
+set.seed(1000)
+(gm_out <- MatchIt::matchit(
+  gm_f,
+  data = gm_df,
+  distance = gm_ps_logit, 
+  m.order = "random",
+  caliper = .25
+))
+```
+
+Notice that a limitation of this matching scheme is that it reduces the sample size from 2758 to 574---287 cases in the control group and 287 cases in the treated group.
+
+### Check Common Support
+
+Greedy matching is criticized because it requires a sizeable common-support region to work. The common support region is defined as the region bounded by the maximum value of estimated propensity scores for the treated participants and by the minimum value of the estimated propensity scores for the nontreated participants. In this example, a sizeable common-support region exists.
+
+```{r fig.width=6, fig.height=3.5, fig.align="center"}
+cobalt::bal.plot(gm_out, var.name = "distance")
+```
+
+### Check Balance
+
+Covariate balance can be assessed using hypothesis tests, such as `chisq.test`:
+
+```{r}
+gm_out_data <- MatchIt::match.data(gm_out)
+chisq.test(gm_out_data$ra, gm_out_data$aodserv)
+```
+
+The object from `matchit()` can be directly used in `cobalt` functions to produce balance tables and plots. To specify additional variables for which to display balance, use the argument `addl` in conjunction with `data`.
+
+```{r fig.width=6, fig.height=3.5, fig.align="center"}
+cobalt::love.plot(gm_out, binary = "std", threshold = c(m = .1), drop.distance = T,
+                  addl = c("ra", "cidi", "cgneed", "cwwrep"), data = gm_df)
+cobalt::bal.tab(gm_out, binary = "std", threshold = c(m = .1), un = T,
+                addl = c("ra", "cidi", "cgneed", "cwwrep"), data = gm_df)
+```
+
+\newpage
+## Greedy Nearest Neighbor Mahalanobis Distance Matching Without Replacement
+
+Here we perform Mahalanobis distance matching without replacement and without including the estimated propensity score.
+
+```{r}
+set.seed(1000)
+(gm_out2 <- MatchIt::matchit(gm_f, data = gm_df, 
+  method = "nearest", distance = "mahalanobis"))
+```
+
+### Check Balance
+
+```{r fig.width=6, fig.height=3.5, fig.align="center"}
+cobalt::love.plot(gm_out2, binary = "std", threshold = c(m = .1),
+                  addl = c("ra", "cidi", "cgneed", "cwwrep"), data = gm_df)
+cobalt::bal.tab(gm_out2, binary = "std", threshold = c(m = .1),
+                addl = c("ra", "cidi", "cgneed", "cwwrep"), data = gm_df)
+```
+
+As seen above, balance has not been achieved in multiple covariates. According to Stuart (2010), "the Mahalanobis distance can work quite well when there are relatively few covariates (fewer than 8), but it does not perform as well when the covariates are not normally distributed or there are many covariates."^[Stuart, E. A. (2010). Matching Methods for Causal Inference: A Review and a Look Forward. *Statistical Science*, *25*(1), 1–21. https://doi.org/10.1214/09-STS313]
+
+\newpage
+# Propensity Score Weighting
+
+## Load Packages
+
+Propensity score weighting can be accomplished with base R. However, we need the `lmtest` and `sandwich` packages to estimate clustered covariance matrices in this example. Using these packages, we can obtain estimates and standard errors that are identical to Stata's `regress` program.
+
+```{r message=F, warning=F, error=F}
+library(lmtest)
+library(sandwich)
+```
+
+## Description of Dataset
+
+This dataset is from a study that investigates intergenerational dependence on welfare and its relation to child academic achievement.^[Hofferth, S., Stafford, F. P., Yeung, W. J., Duncan, G. J., Hill, M. S., Lepkowski, J., et al. (2001). *Panel study of income dynamics, 1968–1999: Supplemental files (computer file), ICPSR version*. Ann Arbor: University of Michigan Survey Research Center.]
+
+The dependent variable is `lwss97` or "letter-word identification" score, and the treatment condition is `kuse` or children who used Aid to Families With Dependent Children (AFDC). The covariates are:
+
+- `male`: Child's Gender: Male (Reference: Female)
+- `black`: Child's Race: African American (Reference: Other)
+- `age97`: Child's Age in 1997
+- `pcged97`: Caregiver's Education in 1997 (Years of Schooling)
+- `mratio96`: Ratio of Family Income to Poverty Line in 1996
+
+Additionally, `pcg_id` is a cluster variable that identifies children nested within families.
+
+## Estimate ATE and ATT Weights
+
+Separate weights need to be calculated for estimating the average treatment effect (ATE) and the average treatment effect for the treated (ATT).
+
+For ATE, the weight estimates are calculated as follows for the treatment group:
+
+$$
+\omega = \frac{1}{\hat{e}(x)}
+$$
+
+And for the control group:
+
+$$
+\omega = \frac{1}{1 - \hat{e}(x)}
+$$
+
+For ATT, the weight is 1 for a treated case. The weight for a comparison case is:
+
+$$
+\omega = \frac{\hat{e}(x)}{1 - \hat{e}(x)}
+$$
+
+\newpage
+## Load Data with Propensity Scores and Calculate Weights
+
+```{r}
+psw_df <- read_dta("data/chpt5_2_original.dta") %>%
+  haven::zap_formats() %>%
+  sjlabelled::remove_all_labels() %>%
+  as_tibble() %>%
+  mutate(ate_w = ifelse(kuse == 0, 1/(1 - ps), 1 / ps),
+         att_w = ifelse(kuse == 0, ps/(1 - ps), 1))
+```
+
+## Calculate Weights with the WeightIt Package
+
+```{r message=F, fig.width=6, fig.height=3.5, fig.align="center"}
+# Load Package
+library(WeightIt)
+
+# Estimate ATE and ATT weights and Compare with Previous Results
+ate_w2 <- WeightIt::get_w_from_ps(ps = psw_df$ps, treat = psw_df$kuse, estimand = "ATE")
+table(ate_w2 == psw_df$ate_w)
+att_w2 <- WeightIt::get_w_from_ps(ps = psw_df$ps, treat = psw_df$kuse, estimand = "ATT")
+table(att_w2 == (psw_df$ate_w * psw_df$ps))
+```
+
+## Outcome Analysis
+
+### Weighted Regression with ATE Weights
+
+After creating the weights, use the `weights` argument in `lm()` to run a weighted outcome analysis and `lmtest::coeftest()` to control for clustering effects.
+
+This analysis showed that children who used Aid to Families With Dependent Children (AFDC) had an average letter-word identification score that was 5.16 points lower than children who never used AFDC, $p < .01$.
+
+```{r message=FALSE, warning=FALSE}
+psw_ate <- lm(lwss97 ~ kuse + male + black + age97 + pcged97 + mratio96, 
+  data = psw_df, weights = ate_w) 
+lmtest::coeftest(psw_ate, vcov. = vcovCL(psw_ate, cluster = psw_df$pcg_id))
+```
+
+### Weighted Regression with ATT Weights
+
+When considering only individuals assigned to the treatment condition, children who used AFDC had an average letter-word identification score that was 4.62 points lower than children who never used AFDC, $p < .01$.
+
+```{r message=FALSE, warning=FALSE}
+psw_att <- lm(lwss97 ~ kuse + male + black + age97 + pcged97 + mratio96, 
+  data = psw_df, weights = att_w)
+lmtest::coeftest(psw_att, vcov. = vcovCL(psw_att, cluster = psw_df$pcg_id))
+```
+
+## Check Balance
+
+To assess balance before and after propensity score weighting, use weighted logistic regression for dummy covariates and weighted simple regression for continuous covariates. Some examples are included below, and the full code can be found in Section 7.3.1 of the PSA-R code.
+
+In model `psw_c3` below, the treatment dummy variable is significant, meaning that there is no sufficient balance after the propensity score weighting.
+
+To assess balance before propensity score weighting, remove the `weights` argument.
+
+```{r}
+psw_c1 <- glm(male ~ kuse, family = quasibinomial, data = psw_df, weights = ate_w)
+lmtest::coeftest(psw_c1, vcov. = vcovCL(psw_c1, cluster = psw_df$pcg_id))
+psw_c2 <- glm(male ~ kuse, family = quasibinomial, data = psw_df, weights = att_w)
+lmtest::coeftest(psw_c2, vcov. = vcovCL(psw_c2, cluster = psw_df$pcg_id))
+
+psw_c3 <- lm(age97 ~ kuse, weights = ate_w, data = psw_df)
+lmtest::coeftest(psw_c3, vcov. = vcovCL(psw_c3, cluster = psw_df$pcg_id))
+psw_c4 <- lm(age97 ~ kuse, weights = att_w, data = psw_df)
+lmtest::coeftest(psw_c4, vcov. = vcovCL(psw_c4, cluster = psw_df$pcg_id))
+```
+
+Alternatively, balance can be assessed using standardized mean differences:
+
+```{r}
+# ATE
+cobalt::bal.tab(
+  x = select(psw_df, male, black, age97, pcged97, mratio96),
+  treat = psw_df$kuse,
+  weights = psw_df$ate_w,
+  binary = "std",
+  continuous = "std",
+  s.d.denom = "pooled",
+  un = T,
+  stats = c("mean.diffs"),
+  thresholds = c(m = .1)
+)
+
+# ATT
+cobalt::bal.tab(
+  x = select(psw_df, male, black, age97, pcged97, mratio96),
+  treat = psw_df$kuse,
+  weights = psw_df$ate_w,
+  binary = "std",
+  continuous = "std",
+  s.d.denom = "treated",
+  un = T,
+  stats = c("mean.diffs"),
+  thresholds = c(m = .1)
+)
+```
+
+\newpage
+# Propensity Score Estimation Using Generalized Boosted Regression
+
+## Load Package
+
+Generalized boosted regression (GBR) requires the `gbm` package.
+
+```{r message=F, warning=F, error=F}
+library(gbm)
+```
+
+## Load Data and Sort
+
+Generalized boosted regression is an iterative method for creating propensity scores. Therefore, to create reproducible results, we need to use the `set.seed()` function.
+
+After importing the data, missing data is deleted listwise, and the data is sorted randomly. According to the `gbm` package vignette, if the data is sorted in a systematic way, then the data should be shuffled before running `gbm`.
+
+```{r}
+set.seed(1000)
+gbr_df <- read_dta("data/g3aca1.dta") %>%
+  haven::zap_formats() %>%
+  sjlabelled::remove_all_labels() %>%
+  as_tibble() %>%
+  select(intbl, ageyc, fmale, blck, whit, hisp, pcedu, ipovl, pcemft, fthr,
+         dicsagg2, dicsint2, dccereg2, dccscom2, dccpros2, draggr2) %>%
+  drop_na() %>%
+  add_column(runif = runif(nrow(.))) %>%
+  arrange(runif) %>%
+  select(-runif)
+```
+
+## Fit Generalized Boosted Regression Model
+
+The `gbm::gbm()` function has many arguments that can be fine-tuned. See `?gbm` for a detailed description of each argument.
+
+A summary of the fitted model provides us with *relative influence*, which is the percentage of log likelihood explained by each input variable. The percentages of influence for all predictor variables sum to 100%.
+
+The GBM showed that `blck` had the strongest influence on the likelihood function (33.7%), followed by `ageyc` (16.3%) and `draggr2` (9.4%).
+
+```{r message=F, fig.width=6, fig.height=3.5, fig.align="center"}
+(gbr_f <- cobalt::f.build("intbl", select(gbr_df, -intbl)))
+
+set.seed(1000)
+gbr_m1 <- gbm::gbm(
+  formula = gbr_f,
+  data = gbr_df,
+  distribution = "bernoulli",
+  n.trees = 1000, # number of trees to fit
+  train.fraction = 0.8, # a random 80% subsample for estimation
+  interaction.depth = 4, # allow all four-way interactions
+  shrinkage = 0.0005 # small shrinkage to ensure smooth fit
+)
+summary(gbr_m1)
+```
+
+## Estimate Propensity Scores
+
+After fitting the model, estimate propensity scores using the `predict.gbm()` function.
+
+```{r message=F, warning=F, error=F}
+psb <- gbm::predict.gbm(gbr_m1, data = gbr_df, type = "response")
+head(psb)
+```
+
+\newpage
+## Plot Propensity Score Distributions
+
+As seen in the figure below, the propensity scores estimated by GBM has sufficient overlap between the control and treatment groups (i.e., "common support"), and the distributions are similar.
+
+```{r fig.width=6, fig.height=3.5, fig.align="center"}
+gbr_df %>%
+  mutate(psb = psb, intbl = factor(intbl, labels = c("Control", "Treatment"))) %>%
+  ggplot(aes(x = psb, color = intbl)) + theme_classic() +
+  geom_density(size = 1) + xlim(0, 1) + ylim(0, 22) +
+  labs(x = "Predicted Probability", y = "Density",
+       title = "Propensity Scores Using Generalized Boosted Regression", 
+       color = "Treatment") +
+  theme(legend.position = c(0.9, 0.85))
+```
+
+## Summary Statistics of Propensity Scores
+
+```{r}
+summary(psb)
+```
+
+\newpage
+
+## GBR Using the WeightIt Package
+
+As an alternative to the `gbm` package, the `WeightIt` package can also fit GBR models.
+
+```{r message=F, fig.width=6, fig.height=3.5, fig.align="center"}
+set.seed(1000)
+(gbr_m2 <- WeightIt::weightit(
+  formula = gbr_f,
+  data = gbr_df,
+  method = "gbm",
+  estimand = "ATE",
+  distribution = "bernoulli",
+  stop.method = "es.mean",
+  n.trees = 10000, # different
+  nTrain = 0.8 * nrow(gbr_df), # different
+  interaction.depth = 4,
+  shrinkage = 0.0005
+))
+
+# ATE Weights
+head(gbr_m2$weights)
+```
+
+\newpage
+### Check Balance
+
+Using a standardized mean difference cut-off point of 0.1, it can be seen below that balance has been achieved in most, but not all, of the covariates:
+
+```{r message=F, fig.width=6, fig.height=3.5, fig.align="center"}
+cobalt::love.plot(gbr_m2,
+  thresholds = c(m = .1),
+  binary = "std", abs = T, drop.distance = T
+) +
+  labs(title = "Covariate Balance (ATE)")
+```
+
+\newpage
+# Matching Estimators
+
+## Load Packages
+
+The Breusch-Pagan test against heteroskedasticity requires the `lmtest` package, and a variety of matching estimators are implemented in the `Matching` package.
+
+```{r message=F, warning=F, error=F}
+library(lmtest)
+library(Matching)
+library(broom)
+select <- dplyr::select
+```
+
+## Description of Dataset
+
+This example uses the 1997 Child Development Supplement (CDS) to the Panel Study of Income Dynamics (PSID) and the core PSID annual data from 1968 to 1997.
+
+The dependent variable in this dataset is `pcss97`, a passage comprehension score. Higher scores on this measure indicate higher academic achievement. The treatment variable is `kuse` or children who ever used Aid to Families With Dependent Children (AFDC). The covariates or matching variables are:
+
+- `male`: Child's Gender: Male (Reference: Female)
+- `black`: Child's Race: African American (Reference: Other)
+- `age97`: Child's Age in 1997
+- `pcged97`: Caregiver's Education in 1997 (Years of Schooling)
+- `mratio96`: Ratio of Family Income to Poverty Line in 1996
+- `pcg_adc`: Caregiver's History of Using Welfare (Number of Years)
+
+## Load Data
+
+```{r}
+me_df <- read_dta("data/cds_pcss97.dta") %>%
+  haven::zap_formats() %>%
+  sjlabelled::remove_all_labels() %>%
+  as_tibble()
+head(me_df) %>%
+  kbl(booktabs = T, linesep = "", digits = 2) %>%
+  kable_styling(position = "center") %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+```
+
+## Breusch-Pagan Test for Heteroskedasticity
+
+The homoskedastic variance estimator assumes that the unit-level treatment effect is constant and that the conditional variance of $Y_i(w)$ given $X_i$ does not vary with either covariates or the treatment. The Breusch-Pagan test is performed for each of the seven independent variables and showed that child's age was statistically significant, $p < .01$, indicating that the conditional variance of the dependent variable was not constant across levels of child's age. Therefore, the robust variance estimator should be used in the next stage to allow for heteroskedasticity.
+
+```{r message=FALSE, warning=FALSE}
+# Regress outcome on treatment and matching variables using OLS
+me_m1 <- lm(pcss97 ~ kuse + male + black + age97 + pcged97 + mratio96 + pcg_adc,
+  data = me_df
+)
+
+# Bresuch-Pagan test
+bp <- function(var, df, md) {
+  lmtest::bptest(md, as.formula(paste0("~", var)), data = df, studentize = T) %>%
+    broom::tidy() %>%
+    mutate(variable = var) %>%
+    select(variable, statistic, p.value)
+}
+map_dfr(c("kuse", "male", "black", "age97", "pcged97", "mratio96", "pcg_adc"), bp,
+  df = me_df, md = me_m1
+) %>%
+  kbl(
+    booktabs = T, linesep = "", digits = 2,
+    caption = "Results of Breusch-Pagan Tests for Heteroskedasticity"
+  ) %>%
+  kable_styling(position = "center") %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+```
+
+## Matching Estimators
+
+Of the six matching variables, four are continuous and two are categorical, therefore bias-corrected matching estimator is necessary to correct for bias corresponding to the matching discrepancies between matched units and their matches on the four continuous covariates. Regression adjustment can be used with the `BiasAdjust = T` argument.
+
+By default, the `Matching::Match()` function uses the matching variables to make bias adjustments. However, these covariates can be specified using the `Z` argument (example shown below).
+
+If `Var.calc = 0`, then homoskedasticity is assumed. Use `Var.calc = 4` to request the robust variance estimator using four matches.
+
+The `estimand` argument is by default "ATT," but can be set to "ATE" or "ATC".
+
+The `sample` argument is a logical flag for whether the population or sample variance is returned. An example may help illustrate the difference between PATE and SATE: "While the
+SATE is useful for judging how a job-training program has affected a particular group of
+participants, the PATE can be used to evaluate whether another group of participants
+drawn from the same population is likely to benefit from the program."^[https://journals.sagepub.com/doi/pdf/10.1177/1536867X0400400307]
+
+Results from the `Matching::Match()` function are identical to Stata's `nnmatch` program.
+
+## Define Outcome (Y), Treatment Index (Tr), and Variables to Match On (X)
+
+```{r}
+me_Y <- me_df$pcss97
+me_Tr <- me_df$kuse
+me_X <- select(me_df, male, black, age97, pcged97, mratio96, pcg_adc)
+```
+
+## Get Estimators Individually
+
+Note that by default matching is done with replacement. However, this can be changed with the `replace` argument.
+
+```{r eval=F}
+# Sample Average Treatment Effect (SATE)
+summary(Match(Y = me_Y, Tr = me_Tr, X = me_X, M = 4, BiasAdjust = T, Var.calc = 4,
+              estimand = "ATE", sample = T))
+
+# Population Average Treatment Effect (PATE)
+summary(Match(Y = me_Y, Tr = me_Tr, X = me_X, M = 4, BiasAdjust = T, Var.calc = 4,
+              estimand = "ATE", sample = F))
+
+# Sample average treatment effect for the treated (SATT)
+summary(Match(Y = me_Y, Tr = me_Tr, X = me_X, M = 4, BiasAdjust = T, Var.calc = 4,
+              estimand = "ATT", sample = T))
+
+# Population average treatment effect for the treated (PATT)
+summary(Match(Y = me_Y, Tr = me_Tr, X = me_X, M = 4, BiasAdjust = T, Var.calc = 4,
+              estimand = "ATT", sample = F))
+
+# Sample average treatment effect for the controls (SATC)
+summary(Match(Y = me_Y, Tr = me_Tr, X = me_X, M = 4, BiasAdjust = T, Var.calc = 4,
+              estimand = "ATC", sample = T))
+
+# Population average treatment effect for the controls (PATC)
+summary(Match(Y = me_Y, Tr = me_Tr, X = me_X, M = 4, BiasAdjust = T, Var.calc = 4,
+              estimand = "ATC", sample = F))
+```
+
+## Get All Estimators
+
+```{r}
+# Function for extracting estimate, SE, t-stat, and p-value from Match()
+get_match <- function(estimand, sample, Y = me_Y, Tr = me_Tr, X = me_X) {
+  m <- Matching::Match(
+    Y = Y, Tr = Tr, X = X, M = 4, BiasAdjust = T, Var.calc = 4,
+    estimand = estimand, sample = sample
+  )
+  return(list(
+    est = m$est[, 1],
+    se = m$se,
+    t.stat = m$est[, 1] / m$se,
+    p = (1 - pnorm(abs(m$est[, 1] / m$se))) * 2
+  ))
+}
+
+# Estimate different matching estimators
+tribble(
+  ~estimator, ~estimand, ~sample,
+  "SATE", "ATE", T,
+  "PATE", "ATE", F,
+  "SATT", "ATT", T,
+  "PATT", "ATT", F,
+  "SATC", "ATC", T,
+  "PATC", "ATC", F
+) %>%
+  rowwise() %>%
+  mutate(match = list(get_match(estimand, sample))) %>%
+  unnest_wider(match) %>%
+  select(-estimand, -sample) %>%
+  kbl(
+    booktabs = T, linesep = "",
+    caption = "Bias-Corrected Matching Estimators with Robust Standard Errors"
+  ) %>%
+  kable_styling(position = "center") %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+```
+
+When looking at the ATE, the results suggest that childhood poverty strongly affected children's academic achievement. Children who used AFDC had a passage comprehension score 4.7 units lower than that of children who never used AFDC. When considering only the treated population, this treatment effect was much larger. 
+
+Notice also that "inference on the PATE is made with respect to another sample drawn from the same population; inference on the SATE is made conditional on the sample at hand. (Although this does not affect the choice of estimator, for this reason, the standard error of the estimated PATE is generally larger than the standard error of the estimated SATE.)"^[https://journals.sagepub.com/doi/pdf/10.1177/1536867X0400400307]
+
+\newpage
+## Specify Variables in the Bias-Corrected Matching
+
+```{r}
+# Sample Average Treatment Effect (SATE)
+me_Z <- select(me_df, age97, pcged97, mratio96, pcg_adc) # Covariates for bias adj.
+summary(Match(
+  Y = me_Y, Tr = me_Tr, X = me_X, Z = me_Z, M = 4,
+  BiasAdjust = T, Var.calc = 4, estimand = "ATE", sample = T
+))
+```
+
+\newpage
+## Check Balance
+
+The `Matching::Match()` function works well in conjunction with the `cobalt::bal.tab()` function for checking covariate balance.
+
+By default, the denominator for standardized mean differences uses a pooled estimate (square root of the average of the group variances) for ATE and the standard deviation of the treated group for ATT, and both standard deviations are computed using the sample before matching. This option can also be manually set with the `s.d.denom` option.
+
+```{r}
+# Covariate Balance for SATE
+me_SATE <- Match(
+  Y = me_Y, Tr = me_Tr, X = me_X, M = 4, BiasAdjust = T, Var.calc = 4,
+  estimand = "ATE", sample = T
+)
+bal.tab(
+  me_SATE, kuse ~ male + black + age97 + pcged97 + mratio96 + pcg_adc,
+  data = me_df,
+  abs = T,
+  un = T,
+  thresholds = c(m = .1),
+  s.d.denom = "pooled"
+)
+```
+
+\newpage
+# Practice Problems
+
+## Practice 1, Problem 1: Generalized Boosted Regression
+
+### Description of Dataset
+
+This dataset is a subset of the experimental dataset used by LaLonde (1986).^[LaLonde, R. J. (1986). Evaluating the Econometric Evaluations of Training Programs with Experimental Data. *The American Economic Review*, *76*(4), 604–620. JSTOR.] The LaLonde study is very famous among observational researchers. LaLonde is one of few pioneering researchers who used experimental data to cross-validate estimates of treatment effects generated by nonexperimental approaches. In this study, LaLonde's original dataset was created by a randomized experiment---a study examining trainee earnings of an employment program where participants were randomly assigned to treatment and control conditions. LaLonde’s study compares the "true" treatment effect from this randomized experiment to a set of estimates generated by nonexperimental approaches. His study shows that "many of the nonexperimental procedures do not replicate the experimentally determined results, and suggests that researchers should be aware of the potential for specification errors in other 
+nonexperimental evaluations" (LaLonde, 1986, p.604).
+
+In this example, we are interested in the effect of participation in a job-training program on individuals' earnings in 1978. Thus, the dependent variable is `re78` or earnings in 1978 (in thousands of 1978 dollars). The binary treatment variable is `t` or participation in a job-training program (1 = treated; 0 = control). The observable covariates are:
+
+- `age`: Age (in years)
+- `educ`: Years of education
+- `black`: African-American
+- `hisp`: Hispanic
+- `married`: Married
+- `u74`: Unemployed in 1974
+- `u75`: Unemployed in 1975
+- `re74`: Earnings in 1974 (in thousands of 1978 dollars)
+- `re75`: Earnings in 1975 (in thousands of 1978 dollars)
+
+### Load and Sort Data
+
+```{r}
+set.seed(1000)
+p11_df <- read_dta("data/ldw_exper.dta") %>%
+  haven::zap_formats() %>%
+  sjlabelled::remove_all_labels() %>%
+  as_tibble() %>%
+  add_column(runif = runif(nrow(.))) %>%
+  arrange(runif) %>%
+  select(-runif)
+```
+
+### Estimate Propensity Scores
+
+```{r message=F}
+set.seed(1000)
+p11_m1 <- gbm::gbm(
+  formula = t ~ age + educ + black + hisp + married + re74 + re75 + u74 + u75,
+  data = p11_df,
+  distribution = "bernoulli",
+  n.trees = 1000,
+  train.fraction = 0.8,
+  interaction.depth = 4,
+  shrinkage = 0.0005
+)
+
+# Estimate Propensity Scores and Obtain Summary Statistics
+p11_df$psb <- gbm::predict.gbm(p11_m1, data = p11_df, type = "response")
+summary(p11_df$psb)
+```
+
+\newpage
+### Histogram and Density Plots of Propensity Scores
+
+```{r fig.width=5.5, fig.height=3, fig.align="center"}
+cobalt::bal.plot(
+  t ~ psb,
+  data = p11_df,
+  var.name = "psb",
+  type = "histogram",
+  mirror = T
+)
+cobalt::bal.plot(
+  t ~ psb,
+  data = p11_df,
+  var.name = "psb"
+)
+```
+
+\newpage
+### Boxplot of Propensity Scores
+
+```{r fig.width=6, fig.height=3.5, fig.align="center"}
+p11_df %>%
+  mutate(t = factor(t, labels = c("Control", "Treatment"))) %>%
+  ggplot(aes(x = t, y = psb, color = t, fill = t)) + 
+  theme_classic() +
+  geom_boxplot(alpha = 0.7) +
+  labs(x = "Treatment Condition",
+       y = "Predicted Probability",
+       title = "Boxplots of Propensity Scores") +
+  theme(legend.position = "none")
+```
+
+\newpage
+## Practice 1, Problem 2: Propensity Score Weighting
+
+### Import Stata-Generated Weights for Comparison
+
+```{r message=FALSE, warning=FALSE}
+stata_weights <- read_dta("data/ldw1.dta") %>%
+  haven::zap_formats() %>%
+  sjlabelled::remove_all_labels() %>%
+  as_tibble() %>%
+  mutate(stata_ate_w = ifelse(t == 0, 1 / (1 - psb), 1 / psb),
+         stata_att_w = ifelse(t == 0, psb / (1 - psb), 1)) %>%
+  select(id, stata_ate_w, stata_att_w)
+```
+
+### Estimate ATE and ATT Weights
+
+```{r message=FALSE, warning=FALSE}
+p12_df <- p11_df %>%
+  mutate(ate_w = ifelse(t == 0, 1 / (1 - psb), 1 / psb),
+         att_w = ifelse(t == 0, psb / (1 - psb), 1)) %>%
+  left_join(stata_weights, by = "id") # merge with Stata weights
+```
+
+### Outcome Analysis with ATE and ATT Weights
+
+```{r message=FALSE, warning=FALSE}
+# Define outcome formula
+p12_f <- as.formula(re78 ~ t + age + educ + black + hisp +
+  married + re74 + re75 + u74 + u75)
+
+# Weighted OLS with R-Generated Propensity Scores
+p12_m1 <- lm(p12_f, data = p12_df, weights = ate_w)
+tidy(lmtest::coeftest(p12_m1, vcov. = vcovHC(p12_m1, "HC1"))) %>% filter(term == "t")
+p12_m2 <- lm(p12_f, data = p12_df, weights = att_w)
+tidy(lmtest::coeftest(p12_m2, vcov. = vcovHC(p12_m2, "HC1"))) %>% filter(term == "t")
+
+# Weighted OLS with Stata-Generated Propensity Scores
+p12_m1_stata <- lm(p12_f, data = p12_df, weights = stata_ate_w)
+tidy(lmtest::coeftest(p12_m1_stata, vcov. = vcovHC(p12_m1_stata, "HC1"))) %>%
+  filter(term == "t")
+p12_m2_stata <- lm(p12_f, data = p12_df, weights = stata_att_w)
+tidy(lmtest::coeftest(p12_m2_stata, vcov. = vcovHC(p12_m2_stata, "HC1"))) %>%
+  filter(term == "t")
+```
+
+### Check Balance
+
+We can use logistic regression and OLS regression to check the balance of categorical and continuous covariates, respectively:
+
+```{r eval=F}
+# Categorical Covariates
+i1 <- glm(black ~ t, family = quasibinomial, data = p12_df, weights = stata_ate_w)
+i2 <- glm(hisp ~ t, family = quasibinomial, data = p12_df, weights = stata_ate_w)
+i3 <- glm(married ~ t, family = quasibinomial, data = p12_df, weights = stata_ate_w)
+i4 <- glm(u74 ~ t, family = quasibinomial, data = p12_df, weights = stata_ate_w)
+i5 <- glm(u75 ~ t, family = quasibinomial, data = p12_df, weights = stata_ate_w)
+robustse(i1, coef = "odd.ratio")
+robustse(i2, coef = "odd.ratio")
+robustse(i3, coef = "odd.ratio")
+robustse(i4, coef = "odd.ratio")
+robustse(i5, coef = "odd.ratio")
+
+# Continuous Covariates
+i6 <- lm(age ~ t, data = p12_df, weights = stata_ate_w)
+i7 <- lm(educ ~ t, data = p12_df, weights = stata_ate_w)
+i8 <- lm(re74 ~ t, data = p12_df, weights = stata_ate_w)
+i9 <- lm(re75 ~ t, data = p12_df, weights = stata_ate_w)
+lmtest::coeftest(i6, vcov. = vcovHC(i6, "HC1"))
+lmtest::coeftest(i7, vcov. = vcovHC(i7, "HC1"))
+lmtest::coeftest(i8, vcov. = vcovHC(i8, "HC1"))
+lmtest::coeftest(i9, vcov. = vcovHC(i9, "HC1"))
+
+# Alternative Hypothesis Tests
+library(survey)
+i.svy <- survey::svydesign(~1, weights = p12_df$stata_ate_w, data = p12_df)
+survey::svychisq(~black + t, design = i.svy)
+survey::svychisq(~hisp + t, design = i.svy)
+survey::svychisq(~married + t, design = i.svy)
+survey::svychisq(~u74 + t, design = i.svy)
+survey::svychisq(~u75 + t, design = i.svy)
+survey::svyttest(age ~ t, design = i.svy)
+survey::svyttest(educ ~ t, design = i.svy)
+survey::svyttest(re74 ~ t, design = i.svy)
+survey::svyttest(re75 ~ t, design = i.svy)
+
+# Standardized Mean Differences
+cobalt::bal.tab(
+  p12_df %>% select(black, hisp, married, u74, u75, age, educ, re74, re75),
+  treat = p12_df$t,
+  weights = p12_df$stata_ate_w,
+  abs = T,
+  s.d.denom = "pooled"
+)
+```
+
+\newpage
+
+Function to check balance for all of the covariates (see the Appendix for the custom function `robustse()` that is used to replicate the robust standard errors in Stata):
+
+```{r include=F}
+# Replicate Stata robust standard errors
+robustse <- function(x, coef = c("logit", "odd.ratio", "probs")) {
+  suppressMessages(suppressWarnings(library(lmtest)))
+  suppressMessages(suppressWarnings(library(sandwich)))
+
+  sandwich1 <- function(object, ...) {
+    sandwich(object) *
+      nobs(object) / (nobs(object) - 1)
+  }
+  # Function calculates SE's
+  mod1 <- coeftest(x, vcov = sandwich1)
+  # apply the function over the variance-covariance matrix
+
+  if (coef == "logit") {
+    return(mod1) # return logit with robust SE's
+  } else if (coef == "odd.ratio") {
+    mod1[, 1] <- exp(mod1[, 1]) # return odd ratios with robust SE's
+    mod1[, 2] <- mod1[, 1] * mod1[, 2]
+    return(mod1)
+  } else {
+    mod1[, 1] <- (mod1[, 1] / 4) # return probabilites with robust SE's
+    mod1[, 2] <- mod1[, 2] / 4
+    return(mod1)
+  }
+}
+```
+
+```{r}
+# Function to Check Balance
+check_bal <- function(var, weight, type) {
+  if (type == "categorical") {
+    m <- glm(as.formula(paste0(var, "~t")),
+      family = quasibinomial,
+      data = p12_df,
+      weights = weight
+    )
+    m %>%
+      tidy() %>%
+      mutate(odds.ratio = exp(estimate), variable = var) %>%
+      mutate(or.se = robustse(m, coef = "odd.ratio")[, 2]) %>%
+      mutate(statistic = robustse(m, coef = "odd.ratio")[, 3]) %>%
+      mutate(p.value = robustse(m, coef = "odd.ratio")[, 4]) %>%
+      select(variable, term, odds.ratio, or.se, statistic, p.value)
+  } else if (type == "continuous") {
+    m <- lm(as.formula(paste0(var, "~t")),
+      data = p12_df,
+      weights = weight
+    )
+    lmtest::coeftest(m, vcov. = vcovHC(m, "HC1")) %>%
+      tidy() %>%
+      add_column(var, .before = "term")
+  }
+}
+format_bal <- function(df) {
+  df %>%
+    filter(term != "(Intercept)") %>%
+    kbl(booktabs = T, digits = 7) %>%
+    kable_styling(position = "center") %>%
+    kable_styling(latex_options = c("striped", "HOLD_position"))
+}
+```
+
+```{r}
+# Categorical Variables
+cat_vars <- c("black", "hisp", "married", "u74", "u75")
+format_bal(map_dfr(cat_vars, check_bal, p12_df$stata_ate_w, "categorical"))
+format_bal(map_dfr(cat_vars, check_bal, p12_df$stata_att_w, "categorical"))
+
+# Continuous Variables
+cont_vars <- c("age", "educ", "re74", "re75")
+format_bal(map_dfr(cont_vars, check_bal, p12_df$stata_ate_w, "continuous"))
+format_bal(map_dfr(cont_vars, check_bal, p12_df$stata_att_w, "continuous"))
+```
+
+Similar results can be obtained using the R-generated propensity score weights:
+
+```{r eval=F}
+# With R-generated weights
+format_bal(map_dfr(cat_vars, check_bal, p12_df$ate_w, "categorical"))
+format_bal(map_dfr(cat_vars, check_bal, p12_df$att_w, "categorical"))
+format_bal(map_dfr(cont_vars, check_bal, p12_df$ate_w, "continuous"))
+format_bal(map_dfr(cont_vars, check_bal, p12_df$att_w, "continuous"))
+```
+
+\newpage
+## Practice 1: Alternative Solution with the WeightIt Package
+
+Use the GBM implementation in `WeightIt::weightit()` to estimate ATE and ATT:
+
+```{r}
+set.seed(1000)
+p1_ate <- WeightIt::weightit(
+  formula = t ~ age + educ + black + hisp + married + re74 +
+    re75 + u74 + u75,
+  data = p11_df,
+  method = "gbm",
+  distribution = "bernoulli",
+  stop.method = "es.mean",
+  n.trees = 1000,
+  nTrain = 0.8 * nrow(p11_df),
+  interaction.depth = 4,
+  shrinkage = 0.0005,
+  estimand = "ATE"
+)
+
+set.seed(1000)
+p1_att <- WeightIt::weightit(
+  formula = t ~ age + educ + black + hisp + married + re74 +
+    re75 + u74 + u75,
+  data = p11_df,
+  method = "gbm",
+  distribution = "bernoulli",
+  stop.method = "es.mean",
+  n.trees = 1000,
+  nTrain = 0.8 * nrow(p11_df),
+  interaction.depth = 4,
+  shrinkage = 0.0005,
+  estimand = "ATT"
+)
+```
+
+\newpage
+### Check Balance
+
+```{r fig.width=6, fig.height=3.5, fig.align="center"}
+cobalt::love.plot(p1_ate, thresholds = .1, binary = "std", abs = T, drop.distance = T) + 
+  labs(title = "Covariate Balance (ATE)")
+cobalt::love.plot(p1_att, thresholds = .1, binary = "std", abs = T, drop.distance = T) +
+  labs(title = "Covariate Balance (ATT)")
+```
+
+\newpage
+### Outcome Analysis
+
+For the outcome analysis, the ATE and ATT weights can be obtained with `p1_ate$weights` (ATE) and `p1_att$weights` (ATT):
+
+```{r}
+# ATE
+p1_m1 <- lm(p12_f, data = p11_df, weights = p1_ate$weights)
+tidy(lmtest::coeftest(p1_m1, vcov. = vcovHC(p1_m1, "HC1"))) %>% filter(term == "t")
+
+# ATT
+p1_m2 <- lm(p12_f, data = p11_df, weights = p1_att$weightit)
+tidy(lmtest::coeftest(p1_m2, vcov. = vcovHC(p1_m2, "HC1"))) %>% filter(term == "t")
+```
+
+\newpage
+
+## Practice 2: Matching Estimators
+
+### Load Data
+
+```{r}
+p2_df <- haven::read_dta("data/prac2.dta") %>%
+  haven::zap_formats() %>%
+  sjlabelled::remove_all_labels() %>%
+  as_tibble()
+```
+
+### Breusch-Pagan Test for Heteroskedasticity
+
+The Breusch-Pagan test fits a linear regression model to the residuals of a linear regression model. A statistically significant result indicates that too much of the variance is explained by the additional explanatory variables.
+
+The homoscedasticity assumption is not valid (e.g., p-value of the test for `age97` is < .05), indicating that the conditional variance of the outcome variable was not constant across levels of child's age, therefore a robust estimation of variance is warranted.
+
+```{r message=FALSE, warning=FALSE}
+# Fit a linear regression model, regressing the outcome on the covariates
+p2_m1 <- lm(lwss97 ~ kuse + male + black + age97 + pcged97 + mratio96 + pcg_adc,
+  data = p2_df
+)
+
+# Breusch-Pagan test
+bp <- function(var) {
+  lmtest::bptest(p2_m1, as.formula(paste0("~", var)), data = p2_df, studentize = T) %>%
+    broom::tidy() %>%
+    mutate(variable = var) %>%
+    dplyr::select(variable, statistic, p.value)
+}
+map_dfr(c("kuse", "male", "black", "age97", "pcged97", "mratio96", "pcg_adc"), bp) %>%
+  kbl(
+    booktabs = T, linesep = "", digits = 2,
+    caption = "Results of Breusch-Pagan Tests for Heteroskedasticity"
+  ) %>%
+  kable_styling(position = "center") %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+```
+
+### Define Outcome (Y), Treatment Index (Tr), and Variables to Match On (X)
+
+```{r}
+p2_Y <- p2_df$lwss97
+p2_Tr <- p2_df$kuse
+p2_X <- select(p2_df, male, black, age97, pcged97, mratio96, pcg_adc)
+```
+
+### Define Function for Matching
+
+```{r}
+get_match <- function(estimand, sample, Y = p2_Y, Tr = p2_Tr, X = p2_X) {
+  m <- Matching::Match(
+    Y = Y, Tr = Tr, X = X, M = 4, BiasAdjust = T, Var.calc = 4,
+    estimand = estimand, sample = sample
+  )
+  return(list(
+    est = m$est[, 1],
+    se = m$se,
+    t.stat = m$est[, 1] / m$se,
+    p = (1 - pnorm(abs(m$est[, 1] / m$se))) * 2
+  ))
+}
+```
+
+\newpage
+### Get All Estimators
+
+```{r}
+tribble(
+  ~estimator, ~estimand, ~sample,
+  "SATE", "ATE", T,
+  "PATE", "ATE", F,
+  "SATT", "ATT", T,
+  "PATT", "ATT", F,
+  "SATC", "ATC", T,
+  "PATC", "ATC", F
+) %>%
+  rowwise() %>%
+  mutate(match = list(get_match(estimand, sample))) %>%
+  tidyr::unnest_wider(match) %>%
+  select(-estimand, -sample) %>%
+  kbl(booktabs = T, linesep = "") %>%
+  kable_styling(position = "center") %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+```
+
+\newpage
+# Appendix A: Function to Replicate Stata's Robust Standard Errors
+
+Function by Jorge Cimentada to replicate robust standard errors in Stata:^[https://cimentadaj.github.io/blog/2016-09-19-obtaining-robust-standard-errors-and-odds-ratios/obtaining-robust-standard-errors-and-odds-ratios-for-logistic-regression-in-r/]
+
+
+```{r eval=F}
+robustse <- function(x, coef = c("logit", "odd.ratio", "probs")) {
+  suppressMessages(suppressWarnings(library(lmtest)))
+  suppressMessages(suppressWarnings(library(sandwich)))
+  sandwich1 <- function(object, ...) {
+    sandwich(object) *
+      nobs(object) / (nobs(object) - 1)
+  }
+  mod1 <- coeftest(x, vcov = sandwich1)
+  if (coef == "logit") {
+    return(mod1)
+  } else if (coef == "odd.ratio") {
+    mod1[, 1] <- exp(mod1[, 1])
+    mod1[, 2] <- mod1[, 1] * mod1[, 2]
+    return(mod1)
+  } else {
+    mod1[, 1] <- (mod1[, 1] / 4)
+    mod1[, 2] <- mod1[, 2] / 4
+    return(mod1)
+  }
+}
+```
+
+\newpage
+# Appendix B: Rosenbaum's Sensitivity Analysis
+
+The R package `rbounds` can be used to carry out Rosenbaum's sensitivity analysis. Please refer to Section 11.5.1 and 11.5.2 of the PSA-R code. Below is an example from the `rbounds` package documentation:^[https://cran.r-project.org/web/packages/rbounds/rbounds.pdf]
+
+```{r message=F, warning=F, error=F}
+library(rbounds)
+
+# Data: Matched Data of Lead Blood Levels in Children
+trt <- c(38, 23, 41, 18, 37, 36, 23, 62, 31, 34, 24, 14, 21, 17, 16, 20, 15, 
+         10, 45, 39, 22, 35, 49, 48, 44, 35, 43, 39, 34, 13, 73, 25, 27)
+
+ctrl <- c(16, 18, 18, 24, 19, 11, 10, 15, 16, 18, 18, 13, 19, 10, 16, 16, 24, 13, 
+          9, 14, 21, 19, 7, 18, 19, 12, 11, 22, 25, 16, 13, 11, 13)
+
+hlsens(trt, ctrl)
+```
