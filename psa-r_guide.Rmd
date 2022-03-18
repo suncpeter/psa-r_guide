@@ -80,37 +80,69 @@ Running under: Windows 10 x64 (build 19043)
 Matrix products: default
 
 locale:
-[1] LC_COLLATE=English_United States.1252  LC_CTYPE=English_United States.1252   
-[3] LC_MONETARY=English_United States.1252 LC_NUMERIC=C                          
-[5] LC_TIME=English_United States.1252    
+[1] LC_COLLATE=English_United States.1252
+[2] LC_CTYPE=English_United States.1252
+[3] LC_MONETARY=English_United States.1252
+[4] LC_NUMERIC=C
+[5] LC_TIME=English_United States.1252
 
 attached base packages:
-[1] stats     graphics  grDevices utils     datasets  methods   base     
+[1] stats     graphics  grDevices utils     datasets  methods   base
+
+other attached packages:
+ [1] coin_1.4-2             rbounds_2.1            nnet_7.3-17
+ [4] scales_1.1.1           glue_1.6.2             Matching_4.9-11
+ [7] MASS_7.3-55            WeightIt_0.12.0        PSweight_1.1.6
+[10] estimatr_0.30.6        performance_0.8.0      sjlabelled_1.1.8
+[13] lmerTest_3.1-3         lme4_1.1-28            Matrix_1.4-0
+[16] plm_2.6-1              rlang_1.0.2            optmatch_0.10.0
+[19] kableExtra_1.3.4.9000  knitr_1.37             survminer_0.4.9
+[22] ggpubr_0.4.0           survMisc_0.5.5         survival_3.2-13
+[25] cobalt_4.3.2           MatchIt_4.3.4          mitools_2.4
+[28] broom_0.7.12           sandwich_3.0-1         lmtest_0.9-39
+[31] zoo_1.8-9              stargazer_5.2.3        forcats_0.5.1
+[34] stringr_1.4.0          dplyr_1.0.8            purrr_0.3.4
+[37] readr_2.1.2            tidyr_1.2.0            tibble_3.1.6
+[40] ggplot2_3.3.5          tidyverse_1.3.1        gmodels_2.18.1
+[43] sampleSelection_1.2-12 maxLik_1.5-2           miscTools_0.6-26
+[46] haven_2.4.3
 
 loaded via a namespace (and not attached):
- [1] tidyr_1.2.0            VGAM_1.1-6             splines_4.1.3          foreach_1.5.2         
- [5] carData_3.0-5          gam_1.20.1             gtools_3.9.2           Formula_1.2-4         
- [9] assertthat_0.2.1       stats4_4.1.3           coin_1.4-2             yaml_2.3.5            
-[13] numDeriv_2016.8-1.1    pillar_1.7.0           backports_1.4.1        lattice_0.20-45       
-[17] glue_1.6.2             digest_0.6.29          colorspace_2.0-3       sandwich_3.0-1        
-[21] gbm_2.1.8              htmltools_0.5.2        Matrix_1.4-0           pkgconfig_2.0.3       
-[25] broom_0.7.12           haven_2.4.3            gmodels_2.18.1         bookdown_0.25         
-[29] purrr_0.3.4            mvtnorm_1.1-3          scales_1.1.1           gdata_2.18.0          
-[33] tibble_3.1.6           generics_0.1.2         car_3.0-12             ggplot2_3.3.5         
-[37] sjlabelled_1.1.8       ellipsis_0.3.2         cobalt_4.3.2           TH.data_1.1-0         
-[41] nnet_7.3-17            maxLik_1.5-2           cli_3.2.0              survival_3.2-13       
-[45] magrittr_2.0.2         crayon_1.5.0           MatchIt_4.3.4          evaluate_0.15         
-[49] fansi_1.0.2            MASS_7.3-55            SuperLearner_2.0-28    forcats_0.5.1         
-[53] WeightIt_0.12.0        rsconnect_0.8.25       tools_4.1.3            hms_1.1.1             
-[57] mitools_2.4            multcomp_1.4-18        matrixStats_0.61.0     lifecycle_1.0.1       
-[61] munsell_0.5.0          systemfit_1.1-24       compiler_4.1.3         rlang_1.0.2           
-[65] grid_4.1.3             Matching_4.9-11        iterators_1.0.14       miscTools_0.6-26      
-[69] rbounds_2.1            rmarkdown_2.13         gtable_0.3.0           codetools_0.2-18      
-[73] abind_1.4-5            DBI_1.1.2              R6_2.5.1               nnls_1.4              
-[77] zoo_1.8-9              knitr_1.37             dplyr_1.0.8            fastmap_1.1.0         
-[81] utf8_1.2.2             libcoin_1.0-9          insight_0.16.0         sampleSelection_1.2-12
-[85] modeltools_0.2-23      parallel_4.1.3         Rcpp_1.0.8.2           vctrs_0.3.8           
-[89] tidyselect_1.1.2       xfun_0.30              PSweight_1.1.6         lmtest_0.9-39            
+  [1] readxl_1.3.1        backports_1.4.1     VGAM_1.1-6
+  [4] systemfonts_1.0.4   splines_4.1.3       TH.data_1.1-0
+  [7] digest_0.6.29       foreach_1.5.2       htmltools_0.5.2
+ [10] gdata_2.18.0        fansi_1.0.2         magrittr_2.0.2
+ [13] tzdb_0.2.0          modelr_0.1.8        matrixStats_0.61.0
+ [16] svglite_2.1.0       bdsmatrix_1.3-4     colorspace_2.0-3
+ [19] rvest_1.0.2         rbibutils_2.2.7     xfun_0.30
+ [22] libcoin_1.0-9       crayon_1.5.0        jsonlite_1.8.0
+ [25] iterators_1.0.14    gtable_0.3.0        nnls_1.4
+ [28] emmeans_1.7.2       webshot_0.5.2       car_3.0-12
+ [31] abind_1.4-5         mvtnorm_1.1-3       DBI_1.1.2
+ [34] rstatix_0.7.0       Rcpp_1.0.8.2        viridisLite_0.4.0
+ [37] xtable_1.8-4        km.ci_0.5-2         Formula_1.2-4
+ [40] stats4_4.1.3        survey_4.1-1        collapse_1.7.6
+ [43] SuperLearner_2.0-28 httr_1.4.2          modeltools_0.2-23
+ [46] ellipsis_0.3.2      pkgconfig_2.0.3     farver_2.1.0
+ [49] sass_0.4.0          dbplyr_2.1.1        utf8_1.2.2
+ [52] systemfit_1.1-24    tidyselect_1.1.2    labeling_0.4.2
+ [55] munsell_0.5.0       cellranger_1.1.0    tools_4.1.3
+ [58] cli_3.2.0           generics_0.1.2      evaluate_0.15
+ [61] fastmap_1.1.0       yaml_2.3.5          fs_1.5.2
+ [64] nlme_3.1-155        gam_1.20.1          xml2_1.3.3
+ [67] compiler_4.1.3      rstudioapi_0.13     ggsignif_0.6.3
+ [70] reprex_2.0.1        bslib_0.3.1         stringi_1.7.6
+ [73] highr_0.9           lattice_0.20-45     nloptr_2.0.0
+ [76] gbm_2.1.8           KMsurv_0.1-5        vctrs_0.3.8
+ [79] pillar_1.7.0        lifecycle_1.0.1     Rdpack_2.1.4
+ [82] jquerylib_0.1.4     rlemon_0.1.0        estimability_1.3
+ [85] data.table_1.14.2   insight_0.16.0      R6_2.5.1
+ [88] bookdown_0.25       gridExtra_2.3       codetools_0.2-18
+ [91] boot_1.3-28         gtools_3.9.2        assertthat_0.2.1
+ [94] withr_2.5.0         multcomp_1.4-18     parallel_4.1.3
+ [97] hms_1.1.1           grid_4.1.3          coda_0.19-4
+[100] minqa_1.2.4         rmarkdown_2.13      carData_3.0-5
+[103] numDeriv_2016.8-1.1 lubridate_1.8.0
 ```
 
 \newpage
@@ -607,7 +639,7 @@ The dependent variable in this dataset is `pcss97`, a passage comprehension scor
 ## Load Data
 
 ```{r}
-me_df <- read_dta("data/cds_pcss97.dta") %>%
+me_df <- haven::read_dta("data/cds_pcss97.dta") %>%
   haven::zap_formats() %>%
   sjlabelled::remove_all_labels() %>%
   as_tibble()
@@ -662,7 +694,7 @@ map_dfr(c("kuse", "male", "black", "age97", "pcged97", "mratio96", "pcg_adc"), b
   kable_styling(latex_options = c("striped", "hold_position"))
 ```
 
-Results from the Breusch-Pagan tests showed that the homoskedasticity assumption is not valid for child's age (`age97`) ($p < .05$) and indicated that the conditional variance of the outcome variable was not constant across levels of child's age. Based on this finding, we should use the robust variance estimator that allows for heteroskedasticity (i.e., the `Var.calc` argument in the `Matching:Match()` function).
+Results from the Breusch-Pagan tests showed that the homoskedasticity assumption is not valid for child's age (`age97`) ($p < .05$) and indicated that the conditional variance of the outcome variable was not constant across levels of child's age. Based on this finding, we should use the robust variance estimator that allows for heteroskedasticity (i.e., the `Var.calc` argument in the `Matching::Match()` function).
 
 ## Matching Estimators
 
@@ -805,7 +837,7 @@ me_SATE <- Match(
   Y = me_Y, Tr = me_Tr, X = me_X, M = 4, BiasAdjust = T, Var.calc = 4,
   estimand = "ATE", sample = T
 )
-(me_SATE_bal <- bal.tab(
+(me_SATE_bal <- cobalt::bal.tab(
   me_SATE, kuse ~ male + black + age97 + pcged97 + mratio96 + pcg_adc,
   data = me_df,
   abs = T,
@@ -814,7 +846,8 @@ me_SATE <- Match(
   thresholds = c(m = .1),
   s.d.denom = "pooled"
 ))
-love.plot(me_SATE_bal) + labs(title = "Covariate Balance for SATE")
+cobalt::love.plot(me_SATE_bal) + 
+  labs(title = "Covariate Balance for SATE")
 ```
 
 \newpage
@@ -1252,11 +1285,13 @@ tribble(
   kable_styling(latex_options = c("striped", "hold_position"))
 ```
 
-The findings suggest that childhood poverty affected children's academic achievement. On average, children who used AFDC in childhood had a letter-word identification score 5.4 units lower than that of children who had never used AFDC in childhood. This effect is statistically significant in the sample at hand ($p < .05$) as well as in a second sample drawn from the same population ($p < .05$). By design, the point estimates of SATE and PATE are identical, but the standard errors are different.
+The findings suggest that childhood poverty affected children's academic achievement.
 
-With regard to the subpopulation of treated participants, the treatment effect was not statistically significant ($p = .448$ for SATT and $p = .451$ for PATT). Despite the non-significant finding, the direction of the estimates are consistent with ATE and ATC.
+**ATE:** On average, children who used AFDC in childhood had a letter-word identification score 5.4 units lower than that of children who had never used AFDC in childhood. This effect is statistically significant in the sample at hand ($p < .05$) as well as in a second sample drawn from the same population ($p < .05$). By design, the point estimates of SATE and PATE are identical, but the standard errors are different.
 
-Had all controls (i.e., children who never used AFDC) used AFDC and all treated children had not used AFDC, then on average, the control children would have a letter-word identification score 7.02 units lower than their counterparts ($p < .05$ for SATC and $p < .05$ for PATC).
+**ATT:** With regard to the subpopulation of treated participants, the treatment effect was not statistically significant ($p = .448$ for SATT and $p = .451$ for PATT). Despite the non-significant finding, the direction of the estimates are consistent with ATE and ATC.
+
+**ATC:** Had all controls (i.e., children who never used AFDC) used AFDC and all treated children had not used AFDC, then on average, the control children would have a letter-word identification score 7.02 units lower than their counterparts ($p < .05$ for SATC and $p < .05$ for PATC).
 
 ### Compare with Propensity Score Weighting Results
 
@@ -1272,6 +1307,28 @@ lmtest::coeftest(psw_ate, vcov. = vcovCL(psw_ate, cluster = psw_df$pcg_id))
 psw_att <- lm(lwss97 ~ kuse + male + black + age97 + pcged97 + mratio96, 
   data = psw_df, weights = att_w)
 lmtest::coeftest(psw_att, vcov. = vcovCL(psw_att, cluster = psw_df$pcg_id))
+```
+
+### Check Balance
+
+Balance has not been sufficiently achieved in caregiver's education and ratio of family income to poverty line, warranting additional investigation.
+
+```{r fig.width=5.5, fig.height=3, fig.align="center"}
+p2_SATE <- Matching::Match(
+  Y = p2_Y, Tr = p2_Tr, X = p2_X, M = 4, BiasAdjust = T, Var.calc = 4,
+  estimand = "ATE", sample = T
+)
+(p2_SATE_bal <- cobalt::bal.tab(
+  p2_SATE, kuse ~ male + black + age97 + pcged97 + mratio96 + pcg_adc,
+  data = p2_df,
+  abs = T,
+  un = T,
+  binary = "std",
+  thresholds = c(m = .1),
+  s.d.denom = "pooled"
+))
+cobalt::love.plot(p2_SATE_bal) +
+  labs(title = "Covariate Balance for SATE")
 ```
 
 \newpage
@@ -1312,11 +1369,22 @@ The R package `rbounds` can be used to carry out Rosenbaum's sensitivity analysi
 library(rbounds)
 
 # Data: Matched Data of Lead Blood Levels in Children
-trt <- c(38, 23, 41, 18, 37, 36, 23, 62, 31, 34, 24, 14, 21, 17, 16, 20, 15, 
-         10, 45, 39, 22, 35, 49, 48, 44, 35, 43, 39, 34, 13, 73, 25, 27)
+trt <- c(
+  38, 23, 41, 18, 37, 36, 23, 62, 31, 34, 24, 14, 21, 17, 16, 20, 15,
+  10, 45, 39, 22, 35, 49, 48, 44, 35, 43, 39, 34, 13, 73, 25, 27
+)
 
-ctrl <- c(16, 18, 18, 24, 19, 11, 10, 15, 16, 18, 18, 13, 19, 10, 16, 16, 24, 13, 
-          9, 14, 21, 19, 7, 18, 19, 12, 11, 22, 25, 16, 13, 11, 13)
+ctrl <- c(
+  16, 18, 18, 24, 19, 11, 10, 15, 16, 18, 18, 13, 19, 10, 16, 16, 24, 13,
+  9, 14, 21, 19, 7, 18, 19, 12, 11, 22, 25, 16, 13, 11, 13
+)
 
 hlsens(trt, ctrl)
+```
+
+\newpage
+# Appendix C: Session Info
+
+```{r}
+sessionInfo()
 ```
