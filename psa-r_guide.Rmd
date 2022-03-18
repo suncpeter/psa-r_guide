@@ -150,7 +150,7 @@ loaded via a namespace (and not attached):
 
 ## Load Packages
 
-The `haven` and `sjlabelled` packages are used to load and clean Stata data files (.dta); the `MatchIt` package contains functions for greedy matching; the `cobalt` package contains functions for balance checking; and the `tidyverse` package is loaded for its data manipulation functions.
+The `haven` and `sjlabelled` packages are used to load and clean Stata data files (.dta); the `MatchIt` package contains functions for greedy matching^[https://kosukeimai.github.io/MatchIt/articles/matching-methods.html]; the `cobalt` package contains functions for balance checking; and the `tidyverse` package is loaded for its data manipulation functions.
 
 ```{r message=F, warning=F, error=F}
 library(haven)
@@ -1313,6 +1313,8 @@ lmtest::coeftest(psw_att, vcov. = vcovCL(psw_att, cluster = psw_df$pcg_id))
 
 Balance has not been sufficiently achieved in caregiver's education and ratio of family income to poverty line, warranting additional investigation.
 
+**Variance Ratios:** "Although mean differences (including t-tests and chi-square tests) are the most reported balance statistic (Thoemmes and Kim 2011), variance ratios have been recommended in the literature as a means to further examine balance between groups (Austin 2009; Ho et al. 2007; Imai, King, and Stuart 2008). When group variances are similar, the variance ratio will be close to 1. Common thresholds for the variance ratio for balanced groups are .5 and 2 (Stuart 2010; Rubin 2001), though ratios closer to 1 are preferred."^[https://cran.r-project.org/web/packages/cobalt/vignettes/cobalt.html]
+
 ```{r fig.width=5.5, fig.height=3, fig.align="center"}
 p2_SATE <- Matching::Match(
   Y = p2_Y, Tr = p2_Tr, X = p2_X, M = 4, BiasAdjust = T, Var.calc = 4,
@@ -1324,7 +1326,8 @@ p2_SATE <- Matching::Match(
   abs = T,
   un = T,
   binary = "std",
-  thresholds = c(m = .1),
+  stats = c("means.diffs", "variance.ratios"),
+  thresholds = c(m = .1, v = 1),
   s.d.denom = "pooled"
 ))
 cobalt::love.plot(p2_SATE_bal) +
