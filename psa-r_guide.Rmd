@@ -199,7 +199,9 @@ By default, the `MatchIt::matchit()` function performs greedy nearest neighbor m
 
 To avoid dissimilar matches, we can constrain matches so that the absolute distance of propensity scores between two participants is less than a specified tolerance for matching or a caliper. The width of the caliper is by default in standard deviation units and can be specified using the `caliper` argument. A wide caliper may result in more matches and a larger sample, but inexact matching may occur as indicated by large distances on the propensity score between the treated and nontreated cases. Using varying caliper sizes can test the sensitivity of the findings. Here we use a caliper size of a quarter of a standard deviation, which is suggested by Rosenbaum and Rubin (1985).
 
-The order of the matching can be specified using the `m.order` argument. Finally, the logit of the predicted probability from a logistic regression model can be supplied to the `distance` argument. The logit of the predicted probability is used, because the logit is approximately normally distributed.
+The order of the matching can be specified using the `m.order` argument. If this argument is set to `largest`, then matching begins with the treated subject with the highest propensity score; if set to `smallest`, then matching takes places in ascending order of the distance measures; and if `random`, matching takes place in a random order.
+
+Finally, the logit of the predicted probability from a logistic regression model can be supplied to the `distance` argument. The logit of the predicted probability is used, because the logit is approximately normally distributed.
 
 ```{r}
 # Logistic regression specification
@@ -216,16 +218,22 @@ set.seed(1000)
   gm_f,
   data = gm_df,
   distance = gm_ps_logit, 
-  m.order = "random",
+  m.order = "largest", # descending order
   caliper = .25
 ))
 ```
 
 Notice that a limitation of this matching scheme is that it reduces the sample size from 2758 to 574---287 cases in the control group and 287 cases in the treated group.
 
+The `matchit` object will return a `match.matrix`, which contains the treated units as the rownames and the values in each row the names or indices of the control units matched to the treated units:
+
+```{r}
+head(gm_out$match.matrix)
+```
+
 ### Check Common Support
 
-Greedy matching is criticized because it requires a sizeable common-support region to work. The common support region is defined as the region bounded by the maximum value of estimated propensity scores for the treated participants and by the minimum value of the estimated propensity scores for the nontreated participants. In this example, a sizeable common-support region exists.
+Greedy matching is criticized, because it requires a sizeable common-support region to work. The common support region is defined as the region bounded by the maximum value of estimated propensity scores for the treated participants and by the minimum value of the estimated propensity scores for the nontreated participants. In this example, a sizeable common-support region exists. The `discard` argument in `matchit()` can be used to discard units outside a region of common support.
 
 ```{r fig.width=6, fig.height=3.5, fig.align="center"}
 cobalt::bal.plot(gm_out, var.name = "distance")
@@ -550,13 +558,37 @@ cobalt::love.plot(gbr_m2,
 
 ## Load Packages
 
-The Breusch-Pagan test against heteroskedasticity requires the `lmtest` package, and a variety of matching estimators are implemented in the `Matching` package.
+A variety of matching estimators are implemented in the `Matching` package. Because the assumptions about constant treatment effect and homoskedasticity may not be valid for certain types of data, we will also import the `lmtest` package for the Breusch-Pagan Test to check this assumption.
 
 ```{r message=F, warning=F, error=F}
-library(lmtest)
 library(Matching)
+library(lmtest)
 library(broom)
 select <- dplyr::select
+```
+
+Note that the `Matching::Match()` function is intended to be used in conjunction with the `Matching::MatchBalance()` function. However, functions from the `cobalt` package also work well and tend to be cleaner in presentation:^[https://cran.r-project.org/web/packages/cobalt/vignettes/cobalt_A1_other_packages.html#using-bal.tab-with-matching]
+
+```{r eval=F}
+data(lalonde)
+ex_f <- as.formula(treat ~ age + I(age^2) + educ + I(educ^2) + black +
+  hisp + married + nodegr + re74 + I(re74^2) + re75 + I(re75^2) +
+  u74 + u75)
+ex_m1 <- glm(ex_f, family = binomial, data = lalonde)
+ex_p <- ex_m1$fitted.values
+ex_X <- ex_m1$fitted
+ex_Y <- lalonde$re78
+ex_Tr <- lalonde$treat
+ex_rr <- Match(Y = ex_Y, Tr = ex_Tr, X = ex_X, M = 1)
+summary(ex_rr)
+ex_mb <- MatchBalance(treat ~ age + I(age^2) + educ + I(educ^2) + black +
+  hisp + married + nodegr + re74 + I(re74^2) + re75 + I(re75^2) +
+  u74 + u75, data = lalonde, match.out = ex_rr, nboots = 10)
+(ex_bal <- cobalt::bal.tab(ex_rr, ex_f,
+  data = lalonde, distance = ~ex_p, un = T,
+  binary = "std", threshold = .1
+))
+cobalt::love.plot(ex_bal)
 ```
 
 ## Description of Dataset
@@ -565,12 +597,12 @@ This example uses the 1997 Child Development Supplement (CDS) to the Panel Study
 
 The dependent variable in this dataset is `pcss97`, a passage comprehension score. Higher scores on this measure indicate higher academic achievement. The treatment variable is `kuse` or children who ever used Aid to Families With Dependent Children (AFDC). The covariates or matching variables are:
 
-- `male`: Child's Gender: Male (Reference: Female)
-- `black`: Child's Race: African American (Reference: Other)
+- `pcg_adc`: Caregiver's History of Using Welfare (Number of Years; range: 0-7)
 - `age97`: Child's Age in 1997
-- `pcged97`: Caregiver's Education in 1997 (Years of Schooling)
 - `mratio96`: Ratio of Family Income to Poverty Line in 1996
-- `pcg_adc`: Caregiver's History of Using Welfare (Number of Years)
+- `pcged97`: Caregiver's Education in 1997 (Years of Schooling)
+- `male`: Child's Gender: Male (1 = Male; 0 = Female)
+- `black`: Child's Race: African American (1 = African American; 0 = Other)
 
 ## Load Data
 
@@ -587,17 +619,34 @@ head(me_df) %>%
 
 ## Breusch-Pagan Test for Heteroskedasticity
 
-The homoskedastic variance estimator assumes that the unit-level treatment effect is constant and that the conditional variance of $Y_i(w)$ given $X_i$ does not vary with either covariates or the treatment. The Breusch-Pagan test is performed for each of the seven independent variables and showed that child's age was statistically significant, $p < .01$, indicating that the conditional variance of the dependent variable was not constant across levels of child's age. Therefore, the robust variance estimator should be used in the next stage to allow for heteroskedasticity.
+The homoskedastic variance estimator assumes that the unit-level treatment effect is constant and that the conditional variance of $Y_i(w)$ given $X_i$ does not vary with either covariates or the treatment.
+
+To carry out the Breusch-Pagan Test, first we regress the outcome variable on the matching variables using OLS:
 
 ```{r message=FALSE, warning=FALSE}
 # Regress outcome on treatment and matching variables using OLS
 me_m1 <- lm(pcss97 ~ kuse + male + black + age97 + pcged97 + mratio96 + pcg_adc,
   data = me_df
 )
+```
 
-# Bresuch-Pagan test
+Next, we can run the Breusch-Pagan test for each matching variable:
+
+```{r eval=F}
+lmtest::bptest(me_m1, ~kuse, data = me_df, studentize = F)
+lmtest::bptest(me_m1, ~male, data = me_df, studentize = F)
+lmtest::bptest(me_m1, ~black, data = me_df, studentize = F)
+lmtest::bptest(me_m1, ~age97, data = me_df, studentize = F) # significant
+lmtest::bptest(me_m1, ~pcged97, data = me_df, studentize = F)
+lmtest::bptest(me_m1, ~mratio96, data = me_df, studentize = F)
+lmtest::bptest(me_m1, ~pcg_adc, data = me_df, studentize = F)
+```
+
+Or use a function to test every variable:
+
+```{r}
 bp <- function(var, df, md) {
-  lmtest::bptest(md, as.formula(paste0("~", var)), data = df, studentize = T) %>%
+  lmtest::bptest(md, as.formula(paste0("~", var)), data = df, studentize = F) %>%
     broom::tidy() %>%
     mutate(variable = var) %>%
     select(variable, statistic, p.value)
@@ -613,24 +662,30 @@ map_dfr(c("kuse", "male", "black", "age97", "pcged97", "mratio96", "pcg_adc"), b
   kable_styling(latex_options = c("striped", "hold_position"))
 ```
 
+Results from the Breusch-Pagan tests showed that the homoskedasticity assumption is not valid for child's age (`age97`) ($p < .05$) and indicated that the conditional variance of the outcome variable was not constant across levels of child's age. Based on this finding, we should use the robust variance estimator that allows for heteroskedasticity (i.e., the `Var.calc` argument in the `Matching:Match()` function).
+
 ## Matching Estimators
 
-Of the six matching variables, four are continuous and two are categorical, therefore bias-corrected matching estimator is necessary to correct for bias corresponding to the matching discrepancies between matched units and their matches on the four continuous covariates. Regression adjustment can be used with the `BiasAdjust = T` argument.
+Of the six matching variables in this example, four are continuous and two are categorical, therefore bias-corrected matching estimator is necessary to correct for bias corresponding to the matching discrepancies between matched units and their matches on the four continuous covariates. Regression adjustment can be used with the `BiasAdjust = T` argument. (Tip: When you have one or more continuous covariate in your matching, always use the bias-corrected matching estimator.)
 
 By default, the `Matching::Match()` function uses the matching variables to make bias adjustments. However, these covariates can be specified using the `Z` argument (example shown below).
 
-If `Var.calc = 0`, then homoskedasticity is assumed. Use `Var.calc = 4` to request the robust variance estimator using four matches.
+The `M` argument specifies the number of matches which should be found. The default is one-to-one matching (i.e., M = 1). Abadie and Imbens suggest that M be small, and `M = 4` typically performs well in terms of mean-squared error.
 
-The `estimand` argument is by default "ATT," but can be set to "ATE" or "ATC".
+If `Var.calc = 0`, then homoskedasticity is assumed. Use `Var.calc = 4` to request the robust variance estimator using four matches. This algorithm developed by Abadie and Imbens (2002) includes a second matching procedure such that it matches treated units to treated units and control units to controls.
+
+The `estimand` argument is by default "ATT," but can be set to "ATE" or "ATC". Typically, we are interested in the ATE or ATT.
 
 The `sample` argument is a logical flag for whether the population or sample variance is returned. An example may help illustrate the difference between PATE and SATE: "While the
 SATE is useful for judging how a job-training program has affected a particular group of
 participants, the PATE can be used to evaluate whether another group of participants
-drawn from the same population is likely to benefit from the program."^[https://journals.sagepub.com/doi/pdf/10.1177/1536867X0400400307]
+drawn from the same population is likely to benefit from the program."^[https://journals.sagepub.com/doi/pdf/10.1177/1536867X0400400307] In other words, the sample effect shows whether the program is successful in the sample at hand, while the population effect shows whether the same program would be successful in a second sample from the population.
 
 Results from the `Matching::Match()` function are identical to Stata's `nnmatch` program.
 
 ## Define Outcome (Y), Treatment Index (Tr), and Variables to Match On (X)
+
+Use the `Y`, `Tr`, and `X`, arguments in the `Match()` function to specify the outcome, treatment index, and variables to match on, respectively.
 
 ```{r}
 me_Y <- me_df$pcss97
@@ -644,8 +699,9 @@ Note that by default matching is done with replacement. However, this can be cha
 
 ```{r eval=F}
 # Sample Average Treatment Effect (SATE)
-summary(Match(Y = me_Y, Tr = me_Tr, X = me_X, M = 4, BiasAdjust = T, Var.calc = 4,
-              estimand = "ATE", sample = T))
+me1 <- Match(Y = me_Y, Tr = me_Tr, X = me_X, M = 4, BiasAdjust = T, Var.calc = 4,
+              estimand = "ATE", sample = T)
+summary(me1)
 
 # Population Average Treatment Effect (PATE)
 summary(Match(Y = me_Y, Tr = me_Tr, X = me_X, M = 4, BiasAdjust = T, Var.calc = 4,
@@ -672,7 +728,7 @@ summary(Match(Y = me_Y, Tr = me_Tr, X = me_X, M = 4, BiasAdjust = T, Var.calc = 
 
 ```{r}
 # Function for extracting estimate, SE, t-stat, and p-value from Match()
-get_match <- function(estimand, sample, Y = me_Y, Tr = me_Tr, X = me_X) {
+get_match <- function(estimand, sample, Y, Tr, X) {
   m <- Matching::Match(
     Y = Y, Tr = Tr, X = X, M = 4, BiasAdjust = T, Var.calc = 4,
     estimand = estimand, sample = sample
@@ -696,7 +752,7 @@ tribble(
   "PATC", "ATC", F
 ) %>%
   rowwise() %>%
-  mutate(match = list(get_match(estimand, sample))) %>%
+  mutate(match = list(get_match(estimand, sample, me_Y, me_Tr, me_X))) %>%
   unnest_wider(match) %>%
   select(-estimand, -sample) %>%
   kbl(
@@ -707,17 +763,30 @@ tribble(
   kable_styling(latex_options = c("striped", "hold_position"))
 ```
 
-When looking at the ATE, the results suggest that childhood poverty strongly affected children's academic achievement. Children who used AFDC had a passage comprehension score 4.7 units lower than that of children who never used AFDC. When considering only the treated population, this treatment effect was much larger. 
+The results suggest that childhood poverty strongly affected children's academic achievement.
 
-Notice also that "inference on the PATE is made with respect to another sample drawn from the same population; inference on the SATE is made conditional on the sample at hand. (Although this does not affect the choice of estimator, for this reason, the standard error of the estimated PATE is generally larger than the standard error of the estimated SATE.)"^[https://journals.sagepub.com/doi/pdf/10.1177/1536867X0400400307]
+**ATE:** On average, children who used AFDC in childhood had a passage comprehension score 4.7 units lower than that of children who had never used AFDC in childhood. This effect is statistically significant in the sample at hand ($p < .05$) as well as in a second sample drawn from the same population ($p < .05$).
 
-\newpage
+**ATT:** With regard to the subpopulation of treated participants, on average, children who used AFDC in childhood had a passage comprehension score 5.2 units lower than that of children who had never used AFDC in childhood. This effect is statistically significant in the sample at hand ($p < .05$) as well as in a second sample drawn from the same population ($p < .05$).
+
+**ATC:** Had all controls (i.e., children who never used AFDC) used AFDC and all treated children had not used AFDC, then on average, the control children would have a passage comprehension score 4.5 units lower than their counterparts ($p < .05$ for SATC and $p < .05$ for PATC).
+
+Additional observations:
+
+1. A population effect indicates whether the tested intervention will be effective in a second sample taken from the same population. Taking SATT and PATT as examples, the study indicated that the treatment effect for the treated group was statistically significant in the sample at a level of .01. If we take a second sample from the population, we are likely to observe the same level of treatment effect for the treated, and the effect should remain statistically significant at a level of .01. The point estimate of the population effect is identical to the point estimate of its corresponding sample effect. A population effect differs from its corresponding sample effect on variance, and thus significance test on a population effect may have a different conclusion than that on its corresponding sample effect.
+
+2. Note that in this study, SATT = -5.23 and SATC = -4.47, or a difference of 0.76 units. This difference is attributable either to additional selection bias that was not accounted for in the study or to study data that violated assumptions of matching estimators, which suggests the need for further scrutiny.
+
+3. All six treatment effects were statistically significant ($p < .05$). Thus, we can conclude that the study data could not reject a null hypothesis of a zero treatment effect, and childhood poverty appears to be an important factor causing children's poor achievement in passage comprehension.
+
 ## Specify Variables in the Bias-Corrected Matching
+
+The `Z` argument can be used to specify the covariates for which we wish to make bias adjustments.
 
 ```{r}
 # Sample Average Treatment Effect (SATE)
-me_Z <- select(me_df, age97, pcged97, mratio96, pcg_adc) # Covariates for bias adj.
-summary(Match(
+me_Z <- select(me_df, age97, pcged97, mratio96, pcg_adc)
+summary(Matching::Match(
   Y = me_Y, Tr = me_Tr, X = me_X, Z = me_Z, M = 4,
   BiasAdjust = T, Var.calc = 4, estimand = "ATE", sample = T
 ))
@@ -730,20 +799,22 @@ The `Matching::Match()` function works well in conjunction with the `cobalt::bal
 
 By default, the denominator for standardized mean differences uses a pooled estimate (square root of the average of the group variances) for ATE and the standard deviation of the treated group for ATT, and both standard deviations are computed using the sample before matching. This option can also be manually set with the `s.d.denom` option.
 
-```{r}
-# Covariate Balance for SATE
+```{r fig.width=5.5, fig.height=3, fig.align="center"}
+# Example of Checking Balance for SATE
 me_SATE <- Match(
   Y = me_Y, Tr = me_Tr, X = me_X, M = 4, BiasAdjust = T, Var.calc = 4,
   estimand = "ATE", sample = T
 )
-bal.tab(
+(me_SATE_bal <- bal.tab(
   me_SATE, kuse ~ male + black + age97 + pcged97 + mratio96 + pcg_adc,
   data = me_df,
   abs = T,
   un = T,
+  binary = "std",
   thresholds = c(m = .1),
   s.d.denom = "pooled"
-)
+))
+love.plot(me_SATE_bal) + labs(title = "Covariate Balance for SATE")
 ```
 
 \newpage
@@ -1067,6 +1138,21 @@ tidy(lmtest::coeftest(p1_m2, vcov. = vcovHC(p1_m2, "HC1"))) %>% filter(term == "
 
 ## Practice 2: Matching Estimators
 
+### Description of Dataset
+
+This example uses the 1997 Child Development Supplement (CDS) to the Panel Study of Income Dynamics (PSID) and the core PSID annual data from 1968 to 1997.
+
+The dependent variable in this dataset is `lwss97`, a standardized letter-word identification score in 1997 measuring academic achievement. Higher scores on this measure indicate higher academic achievement. The treatment variable is `kuse` or children who ever used Aid to Families With Dependent Children (AFDC). The covariates or matching variables are:
+
+- `pcg_adc`: Caregiver's History of Using Welfare (Number of Years; range: 0-7)
+- `age97`: Child's Age in 1997
+- `mratio96`: Ratio of Family Income to Poverty Line in 1996
+- `pcged97`: Caregiver's Education in 1997 (Years of Schooling)
+- `male`: Child's Gender: Male (1 = Male; 0 = Female)
+- `black`: Child's Race: African American (1 = African American; 0 = Other)
+
+The research question is: What are the sample and population average impacts of being poor on academic achievement, after correcting for observed selection effects?
+
 ### Load Data
 
 ```{r}
@@ -1088,9 +1174,18 @@ p2_m1 <- lm(lwss97 ~ kuse + male + black + age97 + pcged97 + mratio96 + pcg_adc,
   data = p2_df
 )
 
-# Breusch-Pagan test
+# Breusch-Pagan test (one by one)
+lmtest::bptest(p2_m1, ~kuse, data = p2_df, studentize = F)
+lmtest::bptest(p2_m1, ~male, data = p2_df, studentize = F)
+lmtest::bptest(p2_m1, ~black, data = p2_df, studentize = F)
+lmtest::bptest(p2_m1, ~age97, data = p2_df, studentize = F) # significant
+lmtest::bptest(p2_m1, ~pcged97, data = p2_df, studentize = F) # significant
+lmtest::bptest(p2_m1, ~mratio96, data = p2_df, studentize = F) # significant
+lmtest::bptest(p2_m1, ~pcg_adc, data = p2_df, studentize = F)
+
+# Breusch-Pagan test ()
 bp <- function(var) {
-  lmtest::bptest(p2_m1, as.formula(paste0("~", var)), data = p2_df, studentize = T) %>%
+  lmtest::bptest(p2_m1, as.formula(paste0("~", var)), data = p2_df, studentize = F) %>%
     broom::tidy() %>%
     mutate(variable = var) %>%
     dplyr::select(variable, statistic, p.value)
@@ -1104,6 +1199,8 @@ map_dfr(c("kuse", "male", "black", "age97", "pcged97", "mratio96", "pcg_adc"), b
   kable_styling(latex_options = c("striped", "hold_position"))
 ```
 
+Results from the Breusch-Pagan tests showed that child's age, caregiver's education, and income/poverty ratio were statistically significant ($p < .05$) and indicated that the conditional variance of the outcome variable was not constant across levels of each variable. Based on this finding, we should use the robust variance estimator that allows for heteroskedasticity (i.e., the `Var.calc` argument in the `Matching:Match()` function).
+
 ### Define Outcome (Y), Treatment Index (Tr), and Variables to Match On (X)
 
 ```{r}
@@ -1114,8 +1211,10 @@ p2_X <- select(p2_df, male, black, age97, pcged97, mratio96, pcg_adc)
 
 ### Define Function for Matching
 
+By default, the `Matching::Match()` function uses the matching variables to make bias adjustments. However, these covariates can be specified using the `Z` argument.
+
 ```{r}
-get_match <- function(estimand, sample, Y = p2_Y, Tr = p2_Tr, X = p2_X) {
+get_match <- function(estimand, sample, Y, Tr, X) {
   m <- Matching::Match(
     Y = Y, Tr = Tr, X = X, M = 4, BiasAdjust = T, Var.calc = 4,
     estimand = estimand, sample = sample
@@ -1132,6 +1231,8 @@ get_match <- function(estimand, sample, Y = p2_Y, Tr = p2_Tr, X = p2_X) {
 \newpage
 ### Get All Estimators
 
+The outcome analysis of matching estimators is the difference in means between the treated and control group after matching. No covariates are controlled for in the estimation of the treatment effect.
+
 ```{r}
 tribble(
   ~estimator, ~estimand, ~sample,
@@ -1143,12 +1244,34 @@ tribble(
   "PATC", "ATC", F
 ) %>%
   rowwise() %>%
-  mutate(match = list(get_match(estimand, sample))) %>%
+  mutate(match = list(get_match(estimand, sample, p2_Y, p2_Tr, p2_X))) %>%
   tidyr::unnest_wider(match) %>%
   select(-estimand, -sample) %>%
   kbl(booktabs = T, linesep = "") %>%
   kable_styling(position = "center") %>%
   kable_styling(latex_options = c("striped", "hold_position"))
+```
+
+The findings suggest that childhood poverty affected children's academic achievement. On average, children who used AFDC in childhood had a letter-word identification score 5.4 units lower than that of children who had never used AFDC in childhood. This effect is statistically significant in the sample at hand ($p < .05$) as well as in a second sample drawn from the same population ($p < .05$). By design, the point estimates of SATE and PATE are identical, but the standard errors are different.
+
+With regard to the subpopulation of treated participants, the treatment effect was not statistically significant ($p = .448$ for SATT and $p = .451$ for PATT). Despite the non-significant finding, the direction of the estimates are consistent with ATE and ATC.
+
+Had all controls (i.e., children who never used AFDC) used AFDC and all treated children had not used AFDC, then on average, the control children would have a letter-word identification score 7.02 units lower than their counterparts ($p < .05$ for SATC and $p < .05$ for PATC).
+
+### Compare with Propensity Score Weighting Results
+
+The conclusions reached above are consistent with the results reached via propensity score weighting.
+
+```{r message=FALSE, warning=FALSE}
+# ATE
+psw_ate <- lm(lwss97 ~ kuse + male + black + age97 + pcged97 + mratio96, 
+  data = psw_df, weights = ate_w) 
+lmtest::coeftest(psw_ate, vcov. = vcovCL(psw_ate, cluster = psw_df$pcg_id))
+
+# ATT
+psw_att <- lm(lwss97 ~ kuse + male + black + age97 + pcged97 + mratio96, 
+  data = psw_df, weights = att_w)
+lmtest::coeftest(psw_att, vcov. = vcovCL(psw_att, cluster = psw_df$pcg_id))
 ```
 
 \newpage
@@ -1183,7 +1306,7 @@ robustse <- function(x, coef = c("logit", "odd.ratio", "probs")) {
 \newpage
 # Appendix B: Rosenbaum's Sensitivity Analysis
 
-The R package `rbounds` can be used to carry out Rosenbaum's sensitivity analysis. Please refer to Section 11.5.1 and 11.5.2 of the PSA-R code. Below is an example from the `rbounds` package documentation:^[https://cran.r-project.org/web/packages/rbounds/rbounds.pdf]
+The R package `rbounds` can be used to carry out Rosenbaum's sensitivity analysis. Please refer to Sections 11.5.1 and 11.5.2 of the PSA-R code. Below is an example from the `rbounds` package documentation:^[https://cran.r-project.org/web/packages/rbounds/rbounds.pdf]
 
 ```{r message=F, warning=F, error=F}
 library(rbounds)
