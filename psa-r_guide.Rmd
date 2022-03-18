@@ -567,7 +567,7 @@ library(broom)
 select <- dplyr::select
 ```
 
-Note that the `Matching::Match()` function is intended to be used in conjunction with the `Matching::MatchBalance()` function. However, functions from the `cobalt` package also work well and tend to be cleaner in presentation:^[https://cran.r-project.org/web/packages/cobalt/vignettes/cobalt_A1_other_packages.html#using-bal.tab-with-matching]
+Note that the `Matching::Match()` function is intended to be used in conjunction with the `MatchBalance()` function. However, functions from the `cobalt` package also work well and tend to be cleaner in presentation:^[https://cran.r-project.org/web/packages/cobalt/vignettes/cobalt_A1_other_packages.html#using-bal.tab-with-matching]
 
 ```{r eval=F}
 data(lalonde)
